@@ -307,12 +307,16 @@ function buildFallbackCopy(data: ScrapedInput, vertical?: VerticalProfile): Rede
   const rawDesc = (data.description || "").trim();
   let subhead: string;
   if (rawDesc.length >= 25) {
-    // Trim to max ~120 chars at sentence or word boundary
-    subhead = rawDesc.length <= 120
-      ? rawDesc
-      : rawDesc.slice(0, 120).replace(/\s\S*$/, "") + ".";
-    // Strip trailing punctuation duplicates
-    subhead = subhead.replace(/\.{2,}$/, ".").replace(/\.\s*$/, ".");
+    // Prefer first complete sentence(s) under 130 chars — clean sentence boundary, not mid-word chop
+    const sentences = rawDesc.match(/[^.!?]+[.!?]+/g) ?? [];
+    let built = "";
+    for (const s of sentences) {
+      if ((built + s).length <= 130) built += s;
+      else break;
+    }
+    subhead = (built || rawDesc.slice(0, 120)).trim();
+    // Ensure single terminal period
+    if (subhead && !/[.!?]$/.test(subhead)) subhead += ".";
   } else {
     // Vertical-specific fallback lines — no generic copy
     const verticalSubheads: Record<string, string> = {
@@ -377,8 +381,8 @@ function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claud
     </div>`).join("");
 
   const aiBadge = source === "claude"
-    ? `<div class="ai-badge">⚡ AI-Written Copy</div>`
-    : `<div class="ai-badge fallback-badge">📝 Template Copy</div>`;
+    ? `<div class="ai-badge">⚡ AI Copy &nbsp;<span class="claude-credit">Powered by Claude AI</span></div>`
+    : `<div class="ai-badge fallback-badge">📝 Template Preview</div>`;
 
   return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -396,6 +400,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 .badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:28px;background:rgba(${r},${g},${b},.08);border:1px solid rgba(${r},${g},${b},.2);color:${primary}}
 .ai-badge{display:inline-block;position:fixed;bottom:80px;right:20px;padding:6px 14px;border-radius:999px;font-size:.7rem;font-weight:700;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:#00f5a0;z-index:200}
 .fallback-badge{background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.3);color:#ffc800}
+.claude-credit{font-size:10px;font-weight:500;opacity:0.7;letter-spacing:0.02em;padding-left:4px;border-left:1px solid rgba(0,245,160,0.3);margin-left:4px}
 h1{font-size:clamp(2.8rem,7vw,6rem);font-weight:900;line-height:1.05;letter-spacing:-.03em;margin-bottom:20px}
 .subhead{font-size:clamp(1rem,2vw,1.3rem);color:#888;max-width:600px;line-height:1.6;margin-bottom:40px}
 .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
