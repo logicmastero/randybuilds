@@ -208,7 +208,7 @@ Write exactly ${Math.max(data.services.filter(s => s.length > 3).length, 3)} ser
 
   try {
     const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 1000,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
