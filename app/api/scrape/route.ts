@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
     // Return merged payload to frontend
     return NextResponse.json({
       ...redesignData,
+      previewHtml: redesignData.previewHtml ?? null,
       scraped: {
         colors:   scraped.colors,
         phone:    scraped.phone,

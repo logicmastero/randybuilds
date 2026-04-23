@@ -332,9 +332,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       previewUrl: `/preview/${slug}`,
+      previewHtml: html,
       businessName: data.businessName,
       slug,
-      copy,                                          // expose so frontend can show copy preview
+      copy,
       aiPowered: !!process.env.ANTHROPIC_API_KEY,
     });
   } catch (err) {

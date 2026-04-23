@@ -61,7 +61,7 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<null | { previewUrl: string; businessName: string }>(null);
+  const [result, setResult] = useState<null | { previewUrl: string; previewHtml?: string; businessName: string }>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export default function Home() {
   };
 
   return (
-    <div className="grid-bg min-h-screen" style={{ background: "#080808" }}>
+    <div className="grid-bg min-h-screen w-full" style={{ background: "#080808" }}>
       {/* Cursor glow */}
       <div
         className="fixed pointer-events-none z-0 rounded-full"
@@ -216,7 +216,18 @@ export default function Home() {
                 </div>
                 <p className="text-sm mb-4" style={{ color: "#888" }}>Your premium redesign is live. Share it with your team or purchase the full build.</p>
                 <div className="flex gap-3">
-                  <a href={result.previewUrl} target="_blank" rel="noopener noreferrer"
+                  <a
+                    href="#"
+                    onClick={e => {
+                      e.preventDefault();
+                      if (result.previewHtml) {
+                        const blob = new Blob([result.previewHtml], { type: "text/html" });
+                        const url = URL.createObjectURL(blob);
+                        window.open(url, "_blank");
+                      } else {
+                        window.open(result.previewUrl, "_blank");
+                      }
+                    }}
                     className="flex-1 py-3 rounded-xl font-semibold text-sm text-center transition-all"
                     style={{ background: "linear-gradient(135deg, #00f5a0, #00d9f5)", color: "#000" }}>
                     View Full Preview →
@@ -245,7 +256,7 @@ export default function Home() {
 
       {/* Stats Bar */}
       <section className="py-12 px-6" style={{ borderTop: "1px solid #151515", borderBottom: "1px solid #151515", background: "#0a0a0a" }}>
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center" style={{ marginLeft: "auto", marginRight: "auto" }}>
           {[
             { n: 2, s: " weeks", label: "Average delivery" },
             { n: 94, s: "%", label: "Client satisfaction" },
@@ -264,7 +275,7 @@ export default function Home() {
 
       {/* How It Works */}
       <section id="process" className="py-24 px-6">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto" style={{ marginLeft: "auto", marginRight: "auto" }}>
           <div className="text-center mb-16">
             <div className="inline-block font-mono text-xs uppercase tracking-widest mb-4 px-3 py-1 rounded-full"
               style={{ color: "#00f5a0", background: "rgba(0,245,160,0.08)", border: "1px solid rgba(0,245,160,0.15)" }}>
@@ -300,7 +311,7 @@ export default function Home() {
 
       {/* Pricing */}
       <section id="pricing" className="py-24 px-6" style={{ background: "#0a0a0a" }}>
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto" style={{ marginLeft: "auto", marginRight: "auto" }}>
           <div className="text-center mb-16">
             <div className="inline-block font-mono text-xs uppercase tracking-widest mb-4 px-3 py-1 rounded-full"
               style={{ color: "#00f5a0", background: "rgba(0,245,160,0.08)", border: "1px solid rgba(0,245,160,0.15)" }}>
@@ -410,7 +421,8 @@ export default function Home() {
         <div className="font-bold text-lg mb-2" style={{ fontFamily: "monospace" }}>
           randy<span style={{ color: "#00f5a0" }}>builds</span>
         </div>
-        <p className="text-sm" style={{ color: "#444" }}>Premium web design. Built different. © 2026</p>
+        <p className="text-sm" style={{ color: "#444" }}>Premium web design. Built different.</p>
+        <p className="text-xs mt-2" style={{ color: "#333" }}>© {new Date().getFullYear()} RandyBuilds. All rights reserved.</p>
       </footer>
     </div>
   );
