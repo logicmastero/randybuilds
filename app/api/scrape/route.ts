@@ -77,11 +77,37 @@ export async function scrapeWebsite(url: string): Promise<ScrapeResult> {
   const emailMatch = pageText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
   const addressMatch = pageText.match(/\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Way|Blvd)[.,\s]+[A-Za-z\s]+[,\s]+[A-Z]{2}/);
 
+  // Social/nav blacklist — filter out junk that gets scraped as "services"
+  const SERVICE_BLACKLIST = new Set([
+    "facebook","instagram","twitter","youtube","linkedin","tiktok","pinterest","yelp","google",
+    "home","about","contact","menu","blog","news","login","sign in","sign up","register",
+    "privacy policy","terms","sitemap","careers","jobs","faq","search","click here","read more",
+    "learn more","get started","book now","call now","email us","follow us","share","like",
+    "subscribe","newsletter","copyright","all rights reserved","powered by",
+  ]);
   const services: string[] = [];
-  $("h2, h3, li").each((_, el) => {
-    const text = $(el).text().trim();
-    if (text.length > 5 && text.length < 60 && services.length < 8) services.push(text);
+  $("h2, h3").each((_, el) => {
+    const text = $(el).text().trim().replace(/\s+/g, " ");
+    const lower = text.toLowerCase();
+    const isBlacklisted = [...SERVICE_BLACKLIST].some(b => lower.includes(b));
+    const hasNumber = /^\d/.test(text);
+    const tooLong = text.length > 55;
+    const tooShort = text.length < 4;
+    if (!isBlacklisted && !hasNumber && !tooLong && !tooShort && services.length < 6) {
+      services.push(text);
+    }
   });
+  // Fallback — try list items if no h2/h3 services found
+  if (services.length < 2) {
+    $("li").each((_, el) => {
+      const text = $(el).text().trim().replace(/\s+/g, " ");
+      const lower = text.toLowerCase();
+      const isBlacklisted = [...SERVICE_BLACKLIST].some(b => lower.includes(b));
+      if (!isBlacklisted && text.length > 4 && text.length < 45 && services.length < 6) {
+        services.push(text);
+      }
+    });
+  }
 
   return {
     businessName: businessName.trim(),

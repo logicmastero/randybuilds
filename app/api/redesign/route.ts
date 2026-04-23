@@ -102,7 +102,7 @@ Return this exact JSON structure:
   "closingHeadline": "5-8 word closing section headline that makes them want to reach out"
 }
 
-Write exactly ${Math.max(data.services.length, 1)} service objects, one per service listed above.`;
+Write exactly ${Math.max(data.services.length, 1)} service objects, one per service listed above — each with a UNIQUE, specific description for that specific service. Do NOT reuse the same description across services.`;
 
   try {
     const message = await client.messages.create({
