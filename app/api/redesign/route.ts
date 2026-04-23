@@ -50,14 +50,31 @@ function detectVertical(data: ScrapedInput): VerticalProfile {
   })();
 
   // ── Digital / SaaS / Tech ─────────────────────────────────────────────────
-  if (/payment|checkout|billing|invoice|merchant|gateway|fintech|stripe|square|paypal/.test(text))
-    return { label: "fintech / payments platform", defaultCta: "Start for Free", defaultCtaSecondary: "View Pricing", systemPersona: "conversion copywriter for B2B SaaS and fintech products" };
 
-  if (/saas|software|platform|api|sdk|developer|dashboard|cloud|devops|infra|deployment|ci\/cd|pipeline/.test(text))
+  // Domain-level overrides — prevent misclassification for major known brands
+  if (/shopify\.com|bigcommerce\.com|woocommerce\.com|squarespace\.com|wix\.com/.test(domain))
+    return { label: "e-commerce platform", defaultCta: "Start Free Trial", defaultCtaSecondary: "See All Features", systemPersona: "conversion copywriter for e-commerce platform companies selling to merchants" };
+
+  if (/github\.com|gitlab\.com|bitbucket\.org/.test(domain))
     return { label: "developer tools / SaaS platform", defaultCta: "Start Building Free", defaultCtaSecondary: "Read the Docs", systemPersona: "conversion copywriter for developer-focused SaaS products" };
 
-  if (/ecommerce|e-commerce|shop|store|product|cart|shipping|dropship|woocommerce|shopify/.test(text))
-    return { label: "e-commerce platform or store", defaultCta: "Shop Now", defaultCtaSecondary: "See Collections", systemPersona: "conversion copywriter for e-commerce brands and online stores" };
+  if (/notion\.so|airtable\.com|coda\.io|monday\.com|clickup\.com|asana\.com|linear\.app/.test(domain))
+    return { label: "developer tools / SaaS platform", defaultCta: "Get Started Free", defaultCtaSecondary: "See How It Works", systemPersona: "conversion copywriter for productivity and collaboration SaaS products" };
+
+  // e-commerce check BEFORE fintech — "sell online" / "store" / "cart" shouldn't hit fintech
+  if (/ecommerce|e-commerce|sell online|dropship|woocommerce|storefront|product catalog|shopping cart/.test(text))
+    return { label: "e-commerce platform", defaultCta: "Start Free Trial", defaultCtaSecondary: "See All Features", systemPersona: "conversion copywriter for e-commerce platform companies selling to merchants" };
+
+  // Fintech — only pure payment/billing, not ecommerce that touches "payment"
+  if (/\bpayment gateway\b|\bcheckout sdk\b|\bpayment processing\b|\bbilling platform\b|\bmerchant services\b|\bpayroll\b|fintech|\bstripe\.com\b|square|paypal/.test(text))
+    return { label: "fintech / payments platform", defaultCta: "Start for Free", defaultCtaSecondary: "View Pricing", systemPersona: "conversion copywriter for B2B SaaS and fintech products" };
+
+  if (/saas|software platform|api platform|sdk|developer tool|dashboard|cloud infra|devops|ci\/cd|pipeline|repo|repository|open.?source|version control|continuous integration/.test(text))
+    return { label: "developer tools / SaaS platform", defaultCta: "Start Building Free", defaultCtaSecondary: "Read the Docs", systemPersona: "conversion copywriter for developer-focused SaaS products" };
+
+  // Generic shop/store — after domain overrides, catches local ecommerce
+  if (/shop|store|product|cart|shipping/.test(text))
+    return { label: "e-commerce platform", defaultCta: "Shop Now", defaultCtaSecondary: "See Collections", systemPersona: "conversion copywriter for e-commerce brands and online stores" };
 
   if (/marketing|seo|ads|ppc|email campaign|social media|content market|growth hack|demand gen/.test(text))
     return { label: "digital marketing agency / SaaS", defaultCta: "Get a Free Audit", defaultCtaSecondary: "See Case Studies", systemPersona: "conversion copywriter for digital marketing agencies and MarTech SaaS" };
@@ -307,15 +324,33 @@ function buildFallbackCopy(data: ScrapedInput, vertical?: VerticalProfile): Rede
   const rawDesc = (data.description || "").trim();
   let subhead: string;
   if (rawDesc.length >= 25) {
-    // Prefer first complete sentence(s) under 130 chars — clean sentence boundary, not mid-word chop
+    // Collect complete sentences up to 140 chars.
+    // If first sentence alone is over 140, keep it whole (better than mid-word cut).
+    // If absurdly long (200+), hard-cut at last space before 140.
     const sentences = rawDesc.match(/[^.!?]+[.!?]+/g) ?? [];
-    let built = "";
-    for (const s of sentences) {
-      if ((built + s).length <= 130) built += s;
-      else break;
+    if (sentences.length > 0) {
+      let built = "";
+      for (const s of sentences) {
+        const candidate = (built + s).trim();
+        if (candidate.length <= 140) {
+          built = candidate;
+        } else if (built.length === 0) {
+          // First sentence too long — keep whole if ≤200 chars, otherwise hard-cut
+          built = s.trim().length <= 200
+            ? s.trim()
+            : s.slice(0, 140).replace(/\s\S*$/, "").trim() + ".";
+          break;
+        } else {
+          break;
+        }
+      }
+      subhead = built.trim();
+    } else {
+      // No sentence punctuation — hard-cut at last word boundary before 140
+      subhead = rawDesc.length <= 140
+        ? rawDesc
+        : rawDesc.slice(0, 140).replace(/\s\S*$/, "").trim() + ".";
     }
-    subhead = (built || rawDesc.slice(0, 120)).trim();
-    // Ensure single terminal period
     if (subhead && !/[.!?]$/.test(subhead)) subhead += ".";
   } else {
     // Vertical-specific fallback lines — no generic copy
@@ -373,6 +408,9 @@ function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claud
   const r = parseInt(primary.slice(1,3),16);
   const g = parseInt(primary.slice(3,5),16);
   const b = parseInt(primary.slice(5,7),16);
+  const r2 = parseInt(secondary.slice(1,3),16);
+  const g2 = parseInt(secondary.slice(3,5),16);
+  const b2 = parseInt(secondary.slice(5,7),16);
 
   const servicesHTML = copy.services.map(s => `
     <div class="card">
@@ -395,7 +433,28 @@ body{font-family:'Inter',sans-serif;background:#080808;color:#f0f0f0;overflow-x:
 nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;background:rgba(8,8,8,.95);backdrop-filter:blur(20px);border-bottom:1px solid #151515}
 .logo{font-weight:900;font-size:1.3rem;letter-spacing:-.02em;color:#f0f0f0}
 .nav-cta{padding:10px 22px;border-radius:8px;font-weight:700;font-size:.85rem;text-decoration:none;color:#000;background:linear-gradient(135deg,${primary},${secondary})}
-.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 24px 80px;position:relative;background-image:linear-gradient(rgba(${r},${g},${b},.025) 1px,transparent 1px),linear-gradient(90deg,rgba(${r},${g},${b},.025) 1px,transparent 1px);background-size:50px 50px}
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 24px 80px;position:relative;overflow:hidden;background-image:linear-gradient(rgba(${r},${g},${b},.025) 1px,transparent 1px),linear-gradient(90deg,rgba(${r},${g},${b},.025) 1px,transparent 1px);background-size:50px 50px}
+.hero-orb{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0}
+.hero-orb-1{width:700px;height:700px;top:-250px;left:-180px;background:radial-gradient(circle,rgba(${r},${g},${b},.16) 0%,transparent 70%);animation:orb1 14s ease-in-out infinite alternate}
+.hero-orb-2{width:500px;height:500px;bottom:-150px;right:-120px;background:radial-gradient(circle,rgba(${r2},${g2},${b2},.12) 0%,transparent 70%);animation:orb2 18s ease-in-out infinite alternate}
+@keyframes orb1{0%{transform:translate(0,0) scale(1)}100%{transform:translate(60px,40px) scale(1.12)}}
+@keyframes orb2{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-40px,-30px) scale(1.08)}}
+.hero>*:not(.hero-orb){position:relative;z-index:1}
+.hero-mockup{margin-top:52px;width:100%;max-width:640px;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:16px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.65),0 0 0 1px rgba(${r},${g},${b},.15);animation:mockup-rise .8s cubic-bezier(.16,1,.3,1) both .25s}
+@keyframes mockup-rise{from{opacity:0;transform:translateY(28px) scale(.97)}to{opacity:1;transform:none}}
+.mock-bar{display:flex;align-items:center;gap:6px;padding:10px 14px;background:#111;border-bottom:1px solid #1a1a1a}
+.mock-dot{width:10px;height:10px;border-radius:50%;background:#2a2a2a}
+.mock-dot:nth-child(1){background:#ff5f57}.mock-dot:nth-child(2){background:#febc2e}.mock-dot:nth-child(3){background:#28c840}
+.mock-url{margin-left:8px;font-size:11px;color:#444;flex:1;text-align:left;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mock-body{padding:20px 18px 18px}
+.mock-row{height:10px;border-radius:6px;background:#1a1a1a;margin-bottom:10px}
+.mock-row-wide{width:72%}.mock-row-med{width:48%}.mock-row-narrow{width:30%}
+.mock-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.mock-card{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px;display:flex;align-items:flex-start;gap:10px}
+.mock-card-icon{width:32px;height:32px;border-radius:8px;flex-shrink:0}
+.mock-card-lines{flex:1;display:flex;flex-direction:column;gap:6px;padding-top:4px}
+.mock-line{height:8px;background:#1e1e1e;border-radius:4px;width:100%}
+.mock-line.short{width:55%}
 .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 30%,rgba(${r},${g},${b},.09) 0%,transparent 70%);pointer-events:none}
 .badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:28px;background:rgba(${r},${g},${b},.08);border:1px solid rgba(${r},${g},${b},.2);color:${primary}}
 .ai-badge{display:inline-block;position:fixed;bottom:80px;right:20px;padding:6px 14px;border-radius:999px;font-size:.7rem;font-weight:700;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:#00f5a0;z-index:200}
@@ -429,12 +488,30 @@ h1{font-size:clamp(2.8rem,7vw,6rem);font-weight:900;line-height:1.05;letter-spac
 </nav>
 ${aiBadge}
 <section class="hero">
+  <div class="hero-orb hero-orb-1"></div>
+  <div class="hero-orb hero-orb-2"></div>
   <div class="badge">✦ Redesign Preview by RandyBuilds</div>
   <h1><span class="grad">${copy.headline}</span></h1>
   <p class="subhead">${copy.subhead}</p>
   <div class="cta-row">
     <a class="cta-primary" href="#">${copy.cta}</a>
     <a class="cta-secondary" href="#">${copy.ctaSecondary}</a>
+  </div>
+  <div class="hero-mockup" aria-hidden="true">
+    <div class="mock-bar">
+      <span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span>
+      <span class="mock-url">${data.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}</span>
+    </div>
+    <div class="mock-body">
+      <div class="mock-row mock-row-wide"></div>
+      <div class="mock-row mock-row-med"></div>
+      <div class="mock-row mock-row-narrow"></div>
+      <div class="mock-cards">
+        <div class="mock-card"><div class="mock-card-icon" style="background:linear-gradient(135deg,${primary},${secondary})"></div><div class="mock-card-lines"><div class="mock-line"></div><div class="mock-line short"></div></div></div>
+        <div class="mock-card"><div class="mock-card-icon" style="background:linear-gradient(135deg,${secondary},${primary})"></div><div class="mock-card-lines"><div class="mock-line"></div><div class="mock-line short"></div></div></div>
+        <div class="mock-card"><div class="mock-card-icon" style="background:linear-gradient(135deg,${primary}88,${secondary}88)"></div><div class="mock-card-lines"><div class="mock-line"></div><div class="mock-line short"></div></div></div>
+      </div>
+    </div>
   </div>
 </section>
 <section class="services">

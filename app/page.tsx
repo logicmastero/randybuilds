@@ -246,11 +246,11 @@ export default function Home() {
                 )}
 
                 <p className="text-xs mb-4" style={{ color: "#555" }}>
-                  {result.persistedToRedis ? "Shareable link saved for 30 days." : "Preview ready — add Upstash to enable shareable links."}
+                  {result.persistedToRedis ? "Shareable link saved for 30 days." : "Preview ready — open it, then use your browser share button to send the link."}
                 </p>
 
                 <div className="flex gap-3">
-                  {/* Instant preview via blob URL */}
+                  {/* Primary CTA — open preview */}
                   <a
                     href="#"
                     onClick={e => {
@@ -267,19 +267,37 @@ export default function Home() {
                     style={{ background: "linear-gradient(135deg, #00f5a0, #00d9f5)", color: "#000" }}>
                     View Preview →
                   </a>
-                  {/* Shareable link — opens the persistent /preview/[slug] URL */}
-                  {result.persistedToRedis && result.slug && (
-                    <a
-                      href={`/preview/${result.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150"
-                      style={{ background: "#1a1a1a", border: "1px solid #333", color: "#f0f0f0" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#00f5a0"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#333"; }}>
-                      🔗 Share
-                    </a>
-                  )}
+
+                  {/* Share button — blob URL copy with toast (interim until Upstash) */}
+                  <button
+                    onClick={() => {
+                      if (result!.persistedToRedis && result!.slug) {
+                        // Persistent link available — copy that
+                        navigator.clipboard.writeText(`https://randybuilds.vercel.app/preview/${result!.slug}`);
+                      } else if (result!.previewHtml) {
+                        // Blob URL — open it, copy the resulting URL
+                        const blob = new Blob([result!.previewHtml], { type: "text/html" });
+                        const blobUrl = URL.createObjectURL(blob);
+                        // Can't directly copy blob URL cross-origin, so open + signal to user
+                        window.open(blobUrl, "_blank");
+                        navigator.clipboard.writeText(blobUrl).catch(() => {});
+                      }
+                      // Toast feedback
+                      const btn = document.getElementById("share-btn");
+                      if (btn) {
+                        const orig = btn.textContent;
+                        btn.textContent = "✓ Copied!";
+                        setTimeout(() => { if (btn) btn.textContent = orig ?? "Share"; }, 2000);
+                      }
+                    }}
+                    id="share-btn"
+                    className="px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150"
+                    style={{ background: "#1a1a1a", border: "1px solid #333", color: "#f0f0f0", cursor: "pointer" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#00f5a0"; (e.currentTarget as HTMLElement).style.color = "#00f5a0"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#333"; (e.currentTarget as HTMLElement).style.color = "#f0f0f0"; }}>
+                    🔗 Share
+                  </button>
+
                   <a href="#pricing"
                     className="px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150"
                     style={{ background: "#1a1a1a", border: "1px solid #333", color: "#f0f0f0" }}
