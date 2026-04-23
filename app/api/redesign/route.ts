@@ -161,6 +161,8 @@ async function generateRedesignCopy(
 
   const vertical = detectVertical(data);
   console.log(`[redesign] Vertical detected: "${vertical.label}" for ${data.businessName} (${data.url})`);
+  console.log(`[redesign] Scraped payload — desc:${data.description.length}chars headline:"${data.headline.slice(0,60)}" services:${data.services.length} phone:${!!data.phone} address:${!!data.address}`);
+  console.log(`[redesign] ANTHROPIC_API_KEY loaded: ${!!apiKey} len:${apiKey?.length ?? 0} prefix:${apiKey?.slice(0,15) ?? "none"}`);
 
   const client = new Anthropic({ apiKey });
 
