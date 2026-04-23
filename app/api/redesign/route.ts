@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { savePreview, isRedisConfigured } from "../../../lib/preview-store";
 import Anthropic from "@anthropic-ai/sdk";
 
 export const maxDuration = 45;
@@ -364,12 +365,20 @@ ${aiBadge}
 </body></html>`;
 }
 
-// ─── Shared preview store (in-memory, serverless-compatible within warm instance) ──
-export const previewStore = new Map<string, {
-  html: string;
-  businessName: string;
-  createdAt: number;
-}>();
+// ─── Slug generator — short base62, collision-proof ──────────────────────────
+function generateSlug(businessName: string): string {
+  // 8-char base62 from timestamp + random — short enough to text, unique enough to not collide
+  const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const seed = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  let slug = "";
+  let n = hash;
+  for (let i = 0; i < 8; i++) { slug = chars[n % 62] + slug; n = Math.floor(n / 62); }
+  // Prefix with sanitized business name (max 20 chars) for readability
+  const prefix = businessName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 20);
+  return `${prefix}-${slug}`;
+}
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
@@ -383,27 +392,28 @@ export async function POST(req: NextRequest) {
 
     const { copy, source, reason } = await generateRedesignCopy(data);
     const html = buildPreviewHTML(data, copy, source);
+    const slug = generateSlug(data.businessName);
 
-    const slug = data.businessName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") + "-" + Date.now().toString(36);
+    console.log(`[redesign] Saving preview slug="${slug}" source="${source}" redis=${isRedisConfigured()}`);
 
-    previewStore.set(slug, { html, businessName: data.businessName, createdAt: Date.now() });
-    if (previewStore.size > 200) {
-      const oldest = [...previewStore.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
-      previewStore.delete(oldest[0]);
-    }
+    await savePreview(slug, {
+      html,
+      businessName: data.businessName,
+      url: data.url,
+      source,
+      createdAt: Date.now(),
+    });
 
     return NextResponse.json({
       previewUrl: `/preview/${slug}`,
-      previewHtml: html,
+      previewHtml: html,       // blob URL instant display — frontend uses this first
       businessName: data.businessName,
       slug,
       copy,
-      source,         // "claude" | "fallback"
+      source,
       fallbackReason: reason ?? null,
       aiPowered: source === "claude",
+      persistedToRedis: isRedisConfigured(),
     });
 
   } catch (err) {

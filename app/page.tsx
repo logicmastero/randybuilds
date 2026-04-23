@@ -61,7 +61,7 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<null | { previewUrl: string; previewHtml?: string; businessName: string }>(null);
+  const [result, setResult] = useState<null | { previewUrl: string; previewHtml?: string; businessName: string; slug?: string; source?: string; persistedToRedis?: boolean }>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -209,33 +209,83 @@ export default function Home() {
             )}
 
             {result && (
-              <div className="mt-6 p-6 rounded-2xl text-left" style={{ background: "#0e0e0e", border: "1px solid #00f5a0", boxShadow: "0 0 30px rgba(0,245,160,0.15)" }}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-3 h-3 rounded-full" style={{ background: "#00f5a0" }} />
-                  <span className="font-bold" style={{ color: "#00f5a0" }}>Preview Ready — {result.businessName}</span>
+              <div className="mt-6 p-5 rounded-2xl text-left" style={{ background: "#0e0e0e", border: "1px solid #00f5a0", boxShadow: "0 0 30px rgba(0,245,160,0.12)" }}>
+                {/* Header row */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#00f5a0" }} />
+                    <span className="font-bold text-sm" style={{ color: "#00f5a0" }}>Preview Ready — {result.businessName}</span>
+                  </div>
+                  {/* AI source badge */}
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                    style={result.source === "claude"
+                      ? { background: "rgba(0,245,160,0.12)", border: "1px solid rgba(0,245,160,0.3)", color: "#00f5a0" }
+                      : { background: "rgba(255,200,0,0.10)", border: "1px solid rgba(255,200,0,0.3)", color: "#ffc800" }}>
+                    {result.source === "claude" ? "⚡ AI Copy" : "📝 Template"}
+                  </span>
                 </div>
-                <p className="text-sm mb-4" style={{ color: "#888" }}>Your premium redesign is live. Share it with your team or purchase the full build.</p>
+
+                {/* Shareable link box */}
+                {result.persistedToRedis && result.slug && (
+                  <div className="mb-3 px-3 py-2 rounded-lg flex items-center gap-2"
+                    style={{ background: "#161616", border: "1px solid #222" }}>
+                    <span className="text-xs font-mono flex-1 truncate" style={{ color: "#666" }}>
+                      randybuilds.vercel.app/preview/{result.slug}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`https://randybuilds.vercel.app/preview/${result!.slug}`);
+                      }}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-md flex-shrink-0"
+                      style={{ background: "#222", color: "#888", border: "1px solid #333" }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#00f5a0"; (e.currentTarget as HTMLElement).style.borderColor = "#00f5a0"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#888"; (e.currentTarget as HTMLElement).style.borderColor = "#333"; }}>
+                      Copy Link
+                    </button>
+                  </div>
+                )}
+
+                <p className="text-xs mb-4" style={{ color: "#555" }}>
+                  {result.persistedToRedis ? "Shareable link saved for 30 days." : "Preview ready — add Upstash to enable shareable links."}
+                </p>
+
                 <div className="flex gap-3">
+                  {/* Instant preview via blob URL */}
                   <a
                     href="#"
                     onClick={e => {
                       e.preventDefault();
-                      if (result.previewHtml) {
-                        const blob = new Blob([result.previewHtml], { type: "text/html" });
-                        const url = URL.createObjectURL(blob);
-                        window.open(url, "_blank");
+                      if (result!.previewHtml) {
+                        const blob = new Blob([result!.previewHtml], { type: "text/html" });
+                        const blobUrl = URL.createObjectURL(blob);
+                        window.open(blobUrl, "_blank");
                       } else {
-                        window.open(result.previewUrl, "_blank");
+                        window.open(result!.previewUrl, "_blank");
                       }
                     }}
-                    className="flex-1 py-3 rounded-xl font-semibold text-sm text-center transition-all"
+                    className="flex-1 py-3 rounded-xl font-semibold text-sm text-center transition-all duration-150"
                     style={{ background: "linear-gradient(135deg, #00f5a0, #00d9f5)", color: "#000" }}>
-                    View Full Preview →
+                    View Preview →
                   </a>
+                  {/* Shareable link — opens the persistent /preview/[slug] URL */}
+                  {result.persistedToRedis && result.slug && (
+                    <a
+                      href={`/preview/${result.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150"
+                      style={{ background: "#1a1a1a", border: "1px solid #333", color: "#f0f0f0" }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#00f5a0"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#333"; }}>
+                      🔗 Share
+                    </a>
+                  )}
                   <a href="#pricing"
-                    className="px-6 py-3 rounded-xl font-semibold text-sm transition-all"
-                    style={{ background: "#1a1a1a", border: "1px solid #333", color: "#f0f0f0" }}>
-                    See Pricing
+                    className="px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150"
+                    style={{ background: "#1a1a1a", border: "1px solid #333", color: "#f0f0f0" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#00f5a0"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#333"; }}>
+                    Pricing
                   </a>
                 </div>
               </div>
