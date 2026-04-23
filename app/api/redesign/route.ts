@@ -149,31 +149,20 @@ function detectVertical(data: ScrapedInput): VerticalProfile {
 
 // ─── Claude copy generation ───────────────────────────────────────────────────
 
-async function generateRedesignCopy(
-  data: ScrapedInput
-): Promise<{ copy: RedesignCopy; source: "claude" | "fallback"; reason?: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!apiKey) {
-    console.warn("[redesign] ANTHROPIC_API_KEY not set — using fallback");
-    return { copy: buildFallbackCopy(data), source: "fallback", reason: "no_api_key" };
-  }
-
-  const vertical = detectVertical(data);
-  console.log(`[redesign] Vertical detected: "${vertical.label}" for ${data.businessName} (${data.url})`);
-  console.log(`[redesign] Scraped payload — desc:${data.description.length}chars headline:"${data.headline.slice(0,60)}" services:${data.services.length} phone:${!!data.phone} address:${!!data.address}`);
-  console.log(`[redesign] ANTHROPIC_API_KEY loaded: ${!!apiKey} len:${apiKey?.length ?? 0} prefix:${apiKey?.slice(0,15) ?? "none"}`);
-
-  const client = new Anthropic({ apiKey });
-
-  const systemPrompt = `You are a world-class ${vertical.systemPersona}. You write copy that is sharp, specific, and converts. You never use generic filler phrases. You understand that ${vertical.label} businesses have a specific audience with specific needs, and you write directly to that audience's outcome.
-
-Output strict JSON only. No markdown, no explanation, no wrapper text. Just the raw JSON object.`;
-
+// ── Single Claude attempt — separated so retry logic can call it cleanly ─────
+async function callClaude(
+  client: Anthropic,
+  data: ScrapedInput,
+  vertical: VerticalProfile,
+): Promise<RedesignCopy> {
   const hasServices = data.services.filter(s => s.length > 3).length > 0;
   const servicesText = hasServices
     ? data.services.filter(s => s.length > 3).join(", ")
     : "Not found on page — infer from business type and description";
+
+  const systemPrompt = `You are a world-class ${vertical.systemPersona}. You write copy that is sharp, specific, and converts. You never use generic filler phrases. You understand that ${vertical.label} businesses have a specific audience with specific needs, and you write directly to that audience's outcome.
+
+Output strict JSON only. No markdown, no explanation, no wrapper text. Just the raw JSON object.`;
 
   const userPrompt = `Write premium, vertical-appropriate copy for this ${vertical.label} website redesign.
 
@@ -209,49 +198,84 @@ Return ONLY this JSON structure (no markdown, no wrapper):
 
 Write exactly ${Math.max(data.services.filter(s => s.length > 3).length, 3)} service objects. If fewer than 3 services were found, invent the most likely core features/offerings for a ${vertical.label}.`;
 
-  try {
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    });
+  const message = await client.messages.create({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: 1000,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
+  });
 
-    const raw = message.content[0].type === "text" ? message.content[0].text.trim() : "";
-    console.log(`[redesign] Claude raw response (first 300 chars): ${raw.slice(0, 300)}`);
+  const raw = message.content[0].type === "text" ? message.content[0].text.trim() : "";
+  console.log(`[redesign] Claude raw (first 300): ${raw.slice(0, 300)}`);
 
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("[redesign] Claude returned no valid JSON. Raw:", raw.slice(0, 500));
-      throw new Error("No JSON in Claude response");
-    }
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("No JSON in Claude response");
 
-    const parsed = JSON.parse(jsonMatch[0]);
+  const parsed = JSON.parse(jsonMatch[0]);
+  if (!parsed.headline || !parsed.subhead || !parsed.cta) throw new Error("Claude JSON missing required fields");
 
-    if (!parsed.headline || !parsed.subhead || !parsed.cta) {
-      throw new Error("Claude JSON missing required fields");
-    }
+  const fb = buildFallbackCopy(data, vertical);
+  return {
+    headline:        parsed.headline,
+    subhead:         parsed.subhead,
+    services:        Array.isArray(parsed.services) && parsed.services.length > 0 ? parsed.services : fb.services,
+    cta:             parsed.cta,
+    ctaSecondary:    parsed.ctaSecondary || vertical.defaultCtaSecondary,
+    closingHeadline: parsed.closingHeadline || fb.closingHeadline,
+  };
+}
 
-    const fallback = buildFallbackCopy(data, vertical);
-    const copy: RedesignCopy = {
-      headline:        parsed.headline,
-      subhead:         parsed.subhead,
-      services:        Array.isArray(parsed.services) && parsed.services.length > 0
-                         ? parsed.services
-                         : fallback.services,
-      cta:             parsed.cta,
-      ctaSecondary:    parsed.ctaSecondary || vertical.defaultCtaSecondary,
-      closingHeadline: parsed.closingHeadline || fallback.closingHeadline,
-    };
+async function generateRedesignCopy(
+  data: ScrapedInput
+): Promise<{ copy: RedesignCopy; source: "claude" | "fallback"; reason?: string }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
-    console.log(`[redesign] ✓ Claude success — headline: "${copy.headline}", cta: "${copy.cta}"`);
-    return { copy, source: "claude" };
-
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[redesign] Claude failed (${msg}) — falling back`);
-    return { copy: buildFallbackCopy(data, vertical), source: "fallback", reason: msg };
+  if (!apiKey) {
+    console.warn("[redesign] ANTHROPIC_API_KEY not set — using fallback");
+    return { copy: buildFallbackCopy(data), source: "fallback", reason: "no_api_key" };
   }
+
+  const vertical = detectVertical(data);
+  console.log(`[redesign] Vertical: "${vertical.label}" | ${data.businessName} | desc:${data.description.length}c headline:"${data.headline.slice(0,50)}" services:${data.services.length}`);
+  console.log(`[redesign] Key: present=${!!apiKey} len=${apiKey.length} prefix=${apiKey.slice(0,20)}`);
+
+  const client = new Anthropic({ apiKey });
+
+  // Attempt with 1 retry on 5xx/network errors — fast-fail on 401/403 (bad key, no point retrying)
+  let lastError = "";
+  const MAX_ATTEMPTS = 2;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const copy = await callClaude(client, data, vertical);
+      console.log(`[redesign] ✓ Claude success (attempt ${attempt}) — headline: "${copy.headline}"`);
+      return { copy, source: "claude" };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      lastError = msg;
+      console.error(`[redesign] Claude attempt ${attempt}/${MAX_ATTEMPTS} failed: ${msg.slice(0, 200)}`);
+
+      // 401/403 = bad key — no point retrying, fail fast for UX
+      const isAuthError = msg.includes("401") || msg.includes("403") ||
+        msg.includes("authentication_error") || msg.includes("invalid x-api-key") ||
+        msg.includes("permission_error");
+      if (isAuthError) {
+        console.error("[redesign] Auth error — fast-failing, no retry");
+        break;
+      }
+
+      // Only retry on 5xx / network / timeout
+      const isRetryable = msg.includes("5") && /50[0-9]/.test(msg) ||
+        msg.includes("timeout") || msg.includes("ECONNRESET") || msg.includes("fetch");
+      if (!isRetryable || attempt === MAX_ATTEMPTS) break;
+
+      console.log(`[redesign] Retrying in 1s...`);
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+
+  console.error(`[redesign] All Claude attempts failed — falling back. Last error: ${lastError}`);
+  return { copy: buildFallbackCopy(data, vertical), source: "fallback", reason: lastError };
 }
 
 // ─── Fallback copy (vertical-aware) ──────────────────────────────────────────
@@ -260,16 +284,76 @@ function buildFallbackCopy(data: ScrapedInput, vertical?: VerticalProfile): Rede
   const v = vertical || detectVertical(data);
   const services = data.services.filter(s => s.length > 3);
   const serviceItems = services.length > 0
-    ? services.map(s => ({ title: s, desc: "Built to deliver results for your business." }))
+    ? services.map((s, i) => ({
+        title: s,
+        // Rotate descriptions so they're not all identical
+        desc: [
+          "Built to deliver real results for your customers.",
+          "Designed to work harder, so your team doesn't have to.",
+          "The reliable foundation your business depends on.",
+          "Crafted with precision for the people who use it most.",
+          "Where quality work meets consistent delivery.",
+          "Trusted by teams who can't afford to get it wrong.",
+        ][i % 6],
+      }))
     : [
-        { title: "Core Product", desc: "Purpose-built for the needs of your customers." },
-        { title: "Integrations", desc: "Connects seamlessly with the tools you already use." },
-        { title: "Support", desc: "Real help from real people when you need it." },
+        { title: "Core Product",   desc: "Purpose-built for the exact needs of your customers." },
+        { title: "Integrations",   desc: "Connects with the tools your team already depends on." },
+        { title: "Expert Support", desc: "Real people who know the product inside and out." },
       ];
 
+  // Smart subhead — use real meta description if available (truncated cleanly),
+  // otherwise fall back to vertical-specific line. Never use the generic "purpose-built" template.
+  const rawDesc = (data.description || "").trim();
+  let subhead: string;
+  if (rawDesc.length >= 25) {
+    // Trim to max ~120 chars at sentence or word boundary
+    subhead = rawDesc.length <= 120
+      ? rawDesc
+      : rawDesc.slice(0, 120).replace(/\s\S*$/, "") + ".";
+    // Strip trailing punctuation duplicates
+    subhead = subhead.replace(/\.{2,}$/, ".").replace(/\.\s*$/, ".");
+  } else {
+    // Vertical-specific fallback lines — no generic copy
+    const verticalSubheads: Record<string, string> = {
+      "fintech / payments platform":    "Accept payments globally with enterprise-grade security and developer-first APIs.",
+      "e-commerce platform":            "Launch, manage, and scale your online store with one powerful platform.",
+      "developer tools / saas platform":"Ship faster with purpose-built tools trusted by engineering teams worldwide.",
+      "digital marketing agency / saas":"Data-driven campaigns that turn ad spend into measurable, repeatable growth.",
+      "creative / design agency":       "Design that makes people stop scrolling and start paying attention.",
+      "plumbing contractor":            "Licensed plumbers who show up on time and get it fixed right the first time.",
+      "roofing contractor":             "Certified roofers protecting homes across the region — built to last decades.",
+      "electrical contractor":          "Code-compliant electrical work completed safely, on schedule, and on budget.",
+      "hvac contractor":                "Heating and cooling systems installed and serviced by certified technicians.",
+      "general contractor / construction": "Quality builds delivered on time, on budget, by tradespeople who take pride in it.",
+      "local service business":         "Serving the community with work that speaks for itself — every single job.",
+    };
+    const labelKey = v.label.toLowerCase();
+    subhead = Object.entries(verticalSubheads).find(([k]) => labelKey.includes(k.split("/")[0].trim()))?.[1]
+      ?? `${data.businessName} — built for the people who depend on it.`;
+  }
+
+  // Vertical-aware headline — not generic "Built for X."
+  const verticalHeadlines: Record<string, string> = {
+    "fintech":        "Payments that just work.",
+    "e-commerce":     "Your store. Fully under control.",
+    "developer":      "Build faster. Ship with confidence.",
+    "marketing":      "Campaigns that actually convert.",
+    "design":         "Work that makes people stop.",
+    "plumbing":       "Fixed right. The first time.",
+    "roofing":        "Built to handle whatever comes.",
+    "electrical":     "Safe, code-compliant, done right.",
+    "hvac":           "Comfort, year-round.",
+    "construction":   "Built stronger. Built to last.",
+    "local":          "Quality work. Zero drama.",
+  };
+  const hlKey = v.label.toLowerCase();
+  const headline = Object.entries(verticalHeadlines).find(([k]) => hlKey.includes(k))?.[1]
+    ?? `Built for ${v.label.split("/")[0].trim().charAt(0).toUpperCase() + v.label.split("/")[0].trim().slice(1)}.`;
+
   return {
-    headline: `Built for ${v.label.split("/")[0].trim().charAt(0).toUpperCase() + v.label.split("/")[0].trim().slice(1)}.`,
-    subhead: `${data.businessName} — purpose-built for the people who depend on it most.`,
+    headline,
+    subhead,
     services: serviceItems,
     cta: v.defaultCta,
     ctaSecondary: v.defaultCtaSecondary,
