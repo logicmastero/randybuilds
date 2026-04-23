@@ -106,7 +106,7 @@ Write exactly ${Math.max(data.services.length, 1)} service objects, one per serv
 
   try {
     const message = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 800,
       temperature: 0.7,
       system: systemPrompt,
