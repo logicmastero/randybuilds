@@ -245,10 +245,11 @@ Write exactly ${Math.max(data.services.filter(s => s.length > 3).length, 3)} ser
 async function generateRedesignCopy(
   data: ScrapedInput
 ): Promise<{ copy: RedesignCopy; source: "claude" | "fallback"; reason?: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  // ANTHROPIC_API_KEY_NEW is the active key; fall back to legacy name for safety
+  const apiKey = process.env.ANTHROPIC_API_KEY_NEW ?? process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    console.warn("[redesign] ANTHROPIC_API_KEY not set — using fallback");
+    console.warn("[redesign] ANTHROPIC_API_KEY_NEW (and fallback ANTHROPIC_API_KEY) not set — using template fallback");
     return { copy: buildFallbackCopy(data), source: "fallback", reason: "no_api_key" };
   }
 

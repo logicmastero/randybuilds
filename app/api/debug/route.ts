@@ -5,7 +5,8 @@ export const maxDuration = 10;
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const key = process.env.ANTHROPIC_API_KEY ?? "";
+  // Prefer ANTHROPIC_API_KEY_NEW; fall back to legacy name
+  const key = process.env.ANTHROPIC_API_KEY_NEW ?? process.env.ANTHROPIC_API_KEY ?? "";
 
   // Attempt a real lightweight Anthropic API call to prove auth works end-to-end
   let apiReachable: boolean | null = null;
