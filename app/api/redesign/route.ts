@@ -404,137 +404,339 @@ function buildFallbackCopy(data: ScrapedInput, vertical?: VerticalProfile): Rede
 // ─── Preview HTML builder ─────────────────────────────────────────────────────
 
 function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claude" | "fallback"): string {
-  const primary   = data.colors[0] || "#00f5a0";
-  const secondary = data.colors[1] || "#00d9f5";
-  const r = parseInt(primary.slice(1,3),16);
-  const g = parseInt(primary.slice(3,5),16);
-  const b = parseInt(primary.slice(5,7),16);
-  const r2 = parseInt(secondary.slice(1,3),16);
-  const g2 = parseInt(secondary.slice(3,5),16);
-  const b2 = parseInt(secondary.slice(5,7),16);
+  // ── Color system ────────────────────────────────────────────────────────────
+  const primary   = data.colors[0] || "#2563eb";
+  const secondary = data.colors[1] || primary;
 
-  const servicesHTML = copy.services.map(s => `
-    <div class="card">
-      <div class="card-title">${s.title}</div>
-      <div class="card-desc">${s.desc}</div>
+  // Determine if primary is light or dark to set theme
+  const hex = primary.replace("#","");
+  const rr = parseInt(hex.slice(0,2),16), gg = parseInt(hex.slice(2,4),16), bb2 = parseInt(hex.slice(4,6),16);
+  const luminance = (0.299*rr + 0.587*gg + 0.114*bb2)/255;
+  const isDark = luminance < 0.45;
+
+  const bg       = isDark ? "#fafafa" : "#0a0a0a";
+  const bgCard   = isDark ? "#ffffff" : "#111111";
+  const bgMuted  = isDark ? "#f4f4f5" : "#161616";
+  const border   = isDark ? "#e4e4e7" : "#1f1f1f";
+  const textMain = isDark ? "#09090b" : "#f4f4f5";
+  const textMid  = isDark ? "#52525b" : "#a1a1aa";
+  const textDim  = isDark ? "#71717a" : "#71717a";
+  const navBg    = isDark ? "rgba(250,250,250,0.95)" : "rgba(10,10,10,0.97)";
+  const navBdr   = isDark ? "#e4e4e7" : "#1f1f1f";
+  const shadowColor = isDark ? `rgba(${rr},${gg},${bb2},.15)` : `rgba(${rr},${gg},${bb2},.25)`;
+  const orbColor1 = `rgba(${rr},${gg},${bb2},${isDark ? "0.12" : "0.18"})`;
+  const orbColor2 = `rgba(${parseInt(secondary.replace("#","").slice(0,2),16)},${parseInt(secondary.replace("#","").slice(2,4),16)},${parseInt(secondary.replace("#","").slice(4,6),16)},${isDark ? "0.08" : "0.14"})`;
+
+  // ── Logo rendering ─────────────────────────────────────────────────────────
+  const logoHTML = data.logoUrl
+    ? `<img src="${data.logoUrl}" alt="${data.businessName} logo" class="logo-img" onerror="this.style.display='none';document.getElementById('logo-text').style.display='block'">`
+      + `<span id="logo-text" class="logo-text" style="display:none">${data.businessName}</span>`
+    : `<span class="logo-text">${data.businessName}</span>`;
+
+  // ── Services grid ──────────────────────────────────────────────────────────
+  const SERVICE_ICONS = ["◆","◈","◉","▲","✦","⬡"];
+  const servicesHTML = copy.services.map((s, i) => `
+    <div class="card" style="--i:${i}">
+      <div class="card-icon-wrap">
+        <span class="card-icon">${SERVICE_ICONS[i % SERVICE_ICONS.length]}</span>
+      </div>
+      <div class="card-body">
+        <h3 class="card-title">${s.title}</h3>
+        <p class="card-desc">${s.desc}</p>
+      </div>
     </div>`).join("");
 
+  // ── Stats strip (trust signals) ────────────────────────────────────────────
+  const domain = (() => { try { return new URL(data.url).hostname.replace("www.",""); } catch { return data.url; } })();
+
+  // ── Phone / contact pill ───────────────────────────────────────────────────
+  const contactPill = data.phone
+    ? `<a href="tel:${data.phone.replace(/\D/g,"")}" class="contact-pill">📞 ${data.phone}</a>`
+    : data.email
+      ? `<a href="mailto:${data.email}" class="contact-pill">✉ ${data.email}</a>`
+      : "";
+
   const aiBadge = source === "claude"
-    ? `<div class="ai-badge">⚡ AI Copy &nbsp;<span class="claude-credit">Powered by Claude AI</span></div>`
+    ? `<div class="ai-badge">⚡ AI Copy <span class="claude-credit">Powered by Claude AI</span></div>`
     : `<div class="ai-badge fallback-badge">📝 Template Preview</div>`;
 
-  return `<!DOCTYPE html><html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  // ── Stat numbers (vertical-aware) ─────────────────────────────────────────
+  const isLocal = /contractor|trades|plumb|electr|roof|hvac|landscap|clean|auto|restaurant|dental|salon|weld|mechanic|tow/.test(
+    [data.description, ...data.services].join(" ").toLowerCase()
+  );
+  const stats = isLocal
+    ? [["5-Star","Reviews"],["Licensed","& Insured"],["Fast","Response"],["Free","Estimates"]]
+    : [["99.9%","Uptime SLA"],["<50ms","Response Time"],["256-bit","Encryption"],["24/7","Support"]];
+
+  const statsHTML = stats.map(([num,label]) => `
+    <div class="stat-item">
+      <div class="stat-num">${num}</div>
+      <div class="stat-label">${label}</div>
+    </div>`).join(`<div class="stat-div"></div>`);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>${data.businessName} — Premium Redesign by RandyBuilds</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:#080808;color:#f0f0f0;overflow-x:hidden;padding-bottom:72px}
-.grad{background:linear-gradient(135deg,${primary},${secondary});-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 48px;background:rgba(8,8,8,.95);backdrop-filter:blur(20px);border-bottom:1px solid #151515}
-.logo{font-weight:900;font-size:1.3rem;letter-spacing:-.02em;color:#f0f0f0}
-.nav-cta{padding:10px 22px;border-radius:8px;font-weight:700;font-size:.85rem;text-decoration:none;color:#000;background:linear-gradient(135deg,${primary},${secondary})}
-.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 24px 80px;position:relative;overflow:hidden;background-image:linear-gradient(rgba(${r},${g},${b},.025) 1px,transparent 1px),linear-gradient(90deg,rgba(${r},${g},${b},.025) 1px,transparent 1px);background-size:50px 50px}
-.hero-orb{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0}
-.hero-orb-1{width:700px;height:700px;top:-250px;left:-180px;background:radial-gradient(circle,rgba(${r},${g},${b},.16) 0%,transparent 70%);animation:orb1 14s ease-in-out infinite alternate}
-.hero-orb-2{width:500px;height:500px;bottom:-150px;right:-120px;background:radial-gradient(circle,rgba(${r2},${g2},${b2},.12) 0%,transparent 70%);animation:orb2 18s ease-in-out infinite alternate}
-@keyframes orb1{0%{transform:translate(0,0) scale(1)}100%{transform:translate(60px,40px) scale(1.12)}}
-@keyframes orb2{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-40px,-30px) scale(1.08)}}
-.hero>*:not(.hero-orb){position:relative;z-index:1}
-.hero-mockup{margin-top:52px;width:100%;max-width:640px;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:16px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.65),0 0 0 1px rgba(${r},${g},${b},.15);animation:mockup-rise .8s cubic-bezier(.16,1,.3,1) both .25s}
-@keyframes mockup-rise{from{opacity:0;transform:translateY(28px) scale(.97)}to{opacity:1;transform:none}}
-.mock-bar{display:flex;align-items:center;gap:6px;padding:10px 14px;background:#111;border-bottom:1px solid #1a1a1a}
-.mock-dot{width:10px;height:10px;border-radius:50%;background:#2a2a2a}
-.mock-dot:nth-child(1){background:#ff5f57}.mock-dot:nth-child(2){background:#febc2e}.mock-dot:nth-child(3){background:#28c840}
-.mock-url{margin-left:8px;font-size:11px;color:#444;flex:1;text-align:left;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mock-body{padding:20px 18px 18px}
-.mock-row{height:10px;border-radius:6px;background:#1a1a1a;margin-bottom:10px}
-.mock-row-wide{width:72%}.mock-row-med{width:48%}.mock-row-narrow{width:30%}
-.mock-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
-.mock-card{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px;display:flex;align-items:flex-start;gap:10px}
-.mock-card-icon{width:32px;height:32px;border-radius:8px;flex-shrink:0}
-.mock-card-lines{flex:1;display:flex;flex-direction:column;gap:6px;padding-top:4px}
-.mock-line{height:8px;background:#1e1e1e;border-radius:4px;width:100%}
-.mock-line.short{width:55%}
-.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 30%,rgba(${r},${g},${b},.09) 0%,transparent 70%);pointer-events:none}
-.badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:28px;background:rgba(${r},${g},${b},.08);border:1px solid rgba(${r},${g},${b},.2);color:${primary}}
-.ai-badge{display:inline-block;position:fixed;bottom:80px;right:20px;padding:6px 14px;border-radius:999px;font-size:.7rem;font-weight:700;background:rgba(0,245,160,.12);border:1px solid rgba(0,245,160,.3);color:#00f5a0;z-index:200}
+/* ── Reset & base ─────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:${bg};color:${textMain};overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* ── Scroll-reveal ────────────────────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+.reveal.visible{opacity:1;transform:none}
+
+/* ── Navigation ───────────────────────────────────────────────────────── */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:68px;background:${navBg};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid ${navBdr};transition:box-shadow .2s}
+nav.scrolled{box-shadow:0 4px 32px ${shadowColor}}
+.logo-wrap{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-img{height:34px;width:auto;object-fit:contain;display:block}
+.logo-text{font-weight:900;font-size:1.25rem;letter-spacing:-.03em;color:${textMain};white-space:nowrap}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:.875rem;font-weight:500;color:${textMid};text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:${primary}}
+.nav-cta{padding:10px 24px;border-radius:10px;font-weight:700;font-size:.875rem;text-decoration:none;color:#fff !important;background:${primary};transition:opacity .15s,transform .15s;white-space:nowrap}
+.nav-cta:hover{opacity:.88;transform:translateY(-1px)}
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:140px 24px 100px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;z-index:0;background:${bg}}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);pointer-events:none}
+.orb-1{width:800px;height:800px;top:-320px;left:-200px;background:radial-gradient(circle,${orbColor1} 0%,transparent 65%);animation:drift1 18s ease-in-out infinite alternate}
+.orb-2{width:600px;height:600px;bottom:-200px;right:-150px;background:radial-gradient(circle,${orbColor2} 0%,transparent 65%);animation:drift2 24s ease-in-out infinite alternate}
+.orb-3{width:400px;height:400px;top:50%;left:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,${orbColor1} 0%,transparent 60%);opacity:.35;animation:drift3 30s ease-in-out infinite alternate}
+@keyframes drift1{0%{transform:translate(0,0)}100%{transform:translate(80px,60px)}}
+@keyframes drift2{0%{transform:translate(0,0)}100%{transform:translate(-60px,-40px)}}
+@keyframes drift3{0%{transform:translate(-50%,-50%) scale(1)}100%{transform:translate(-50%,-50%) scale(1.3)}}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(${border}40 1px,transparent 1px),linear-gradient(90deg,${border}40 1px,transparent 1px);background-size:64px 64px;z-index:0;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 0%,transparent 100%)}
+.hero>*:not(.hero-bg):not(.orb):not(.hero-grid){position:relative;z-index:1}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:999px;font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:32px;background:${isDark ? `rgba(${rr},${gg},${bb2},.08)` : `rgba(${rr},${gg},${bb2},.12)`};border:1px solid ${isDark ? `rgba(${rr},${gg},${bb2},.2)` : `rgba(${rr},${gg},${bb2},.3)`};color:${primary};animation:eyebrow-in .5s cubic-bezier(.16,1,.3,1) both}
+@keyframes eyebrow-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+h1.hero-headline{font-family:'Playfair Display',Georgia,serif;font-size:clamp(3rem,8vw,7rem);font-weight:900;line-height:1.0;letter-spacing:-.04em;margin-bottom:28px;animation:headline-in .7s cubic-bezier(.16,1,.3,1) both .1s}
+@keyframes headline-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.hero-headline .grad{background:linear-gradient(135deg,${primary} 0%,${secondary} 60%,${primary} 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 4s linear infinite}
+@keyframes shimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+.hero-sub{font-size:clamp(1.05rem,2.2vw,1.35rem);color:${textMid};max-width:640px;line-height:1.7;margin-bottom:48px;animation:sub-in .7s cubic-bezier(.16,1,.3,1) both .2s}
+@keyframes sub-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.cta-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;animation:cta-in .7s cubic-bezier(.16,1,.3,1) both .3s}
+@keyframes cta-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:17px 38px;border-radius:12px;font-weight:800;font-size:1rem;text-decoration:none;color:#fff;background:${primary};box-shadow:0 0 0 0 ${primary}44;transition:transform .15s,box-shadow .2s,opacity .15s;position:relative;overflow:hidden}
+.btn-primary::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px ${isDark ? `rgba(${rr},${gg},${bb2},.3)` : `rgba(${rr},${gg},${bb2},.4)`};opacity:.95}
+.btn-primary:active{transform:translateY(0)}
+.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:17px 38px;border-radius:12px;font-weight:700;font-size:1rem;text-decoration:none;color:${textMain};border:1.5px solid ${border};background:transparent;transition:border-color .15s,background .15s,transform .15s}
+.btn-secondary:hover{border-color:${primary};background:${isDark ? `rgba(${rr},${gg},${bb2},.04)` : `rgba(${rr},${gg},${bb2},.08)`};transform:translateY(-2px)}
+.btn-arrow{font-size:1.1rem;transition:transform .15s}
+.btn-primary:hover .btn-arrow,.btn-secondary:hover .btn-arrow{transform:translateX(4px)}
+${contactPill ? `.contact-pill{display:inline-flex;align-items:center;gap:8px;margin-top:24px;padding:10px 22px;border-radius:999px;font-size:.9rem;font-weight:600;color:${primary};text-decoration:none;border:1.5px solid ${isDark ? `rgba(${rr},${gg},${bb2},.25)` : `rgba(${rr},${gg},${bb2},.35)`};background:${isDark ? `rgba(${rr},${gg},${bb2},.06)` : `rgba(${rr},${gg},${bb2},.1)`};transition:background .15s,transform .15s}
+.contact-pill:hover{background:${isDark ? `rgba(${rr},${gg},${bb2},.12)` : `rgba(${rr},${gg},${bb2},.18)`};transform:translateY(-1px)}` : ""}
+
+/* ── Trust bar ────────────────────────────────────────────────────────── */
+.trust{padding:40px 24px;border-top:1px solid ${border};border-bottom:1px solid ${border};background:${bgMuted}}
+.trust-inner{max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap}
+.stat-item{text-align:center;padding:16px 36px;flex:1;min-width:120px}
+.stat-num{font-size:1.5rem;font-weight:900;letter-spacing:-.03em;color:${primary};line-height:1}
+.stat-label{font-size:.78rem;font-weight:600;color:${textMid};letter-spacing:.06em;text-transform:uppercase;margin-top:6px}
+.stat-div{width:1px;height:40px;background:${border};flex-shrink:0}
+
+/* ── Services ─────────────────────────────────────────────────────────── */
+.services-section{padding:100px 24px;max-width:1160px;margin:0 auto}
+.section-label{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${primary};margin-bottom:16px}
+.section-title{font-family:'Playfair Display',Georgia,serif;font-size:clamp(2rem,5vw,3.6rem);font-weight:900;letter-spacing:-.03em;line-height:1.1;margin-bottom:16px;color:${textMain}}
+.section-sub{font-size:1.05rem;color:${textMid};max-width:560px;line-height:1.7;margin-bottom:64px}
+.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
+.card{background:${bgCard};border:1px solid ${border};border-radius:20px;padding:32px;display:flex;align-items:flex-start;gap:20px;transition:border-color .2s,transform .2s,box-shadow .2s;opacity:0;transform:translateY(20px);transition:opacity .5s cubic-bezier(.16,1,.3,1) calc(var(--i)*80ms), transform .5s cubic-bezier(.16,1,.3,1) calc(var(--i)*80ms), border-color .2s, box-shadow .2s}
+.card.visible{opacity:1;transform:translateY(0)}
+.card:hover{border-color:${primary}44;transform:translateY(-4px);box-shadow:0 20px 60px ${shadowColor}}
+.card-icon-wrap{width:48px;height:48px;border-radius:14px;background:${isDark ? `rgba(${rr},${gg},${bb2},.1)` : `rgba(${rr},${gg},${bb2},.15)`};display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-icon{font-size:1.3rem;color:${primary}}
+.card-body{}
+.card-title{font-size:1.05rem;font-weight:700;color:${textMain};margin-bottom:10px;line-height:1.3}
+.card-desc{font-size:.9rem;color:${textMid};line-height:1.65}
+
+/* ── About strip ──────────────────────────────────────────────────────── */
+.about{padding:80px 24px;background:${bgMuted};border-top:1px solid ${border};border-bottom:1px solid ${border}}
+.about-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.about-text .section-label{margin-bottom:12px}
+.about-headline{font-family:'Playfair Display',Georgia,serif;font-size:clamp(1.8rem,4vw,2.8rem);font-weight:900;letter-spacing:-.03em;line-height:1.15;margin-bottom:20px;color:${textMain}}
+.about-body{font-size:1rem;color:${textMid};line-height:1.8}
+.about-visual{background:${bgCard};border:1px solid ${border};border-radius:24px;padding:36px;display:flex;flex-direction:column;gap:20px}
+.about-stat-row{display:flex;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid ${border}}
+.about-stat-row:last-child{border-bottom:none}
+.about-stat-num{font-size:2rem;font-weight:900;color:${primary};min-width:72px;letter-spacing:-.04em}
+.about-stat-desc{font-size:.9rem;color:${textMid};line-height:1.5}
+
+/* ── CTA closing ──────────────────────────────────────────────────────── */
+.closing{padding:120px 24px;text-align:center;position:relative;overflow:hidden}
+.closing-orb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;border-radius:50%;filter:blur(120px);background:radial-gradient(circle,${orbColor1},transparent 70%);pointer-events:none;z-index:0}
+.closing>*:not(.closing-orb){position:relative;z-index:1}
+.closing-headline{font-family:'Playfair Display',Georgia,serif;font-size:clamp(2.4rem,6vw,5rem);font-weight:900;line-height:1.05;letter-spacing:-.04em;margin-bottom:28px;color:${textMain}}
+.closing-sub{font-size:1.1rem;color:${textMid};max-width:500px;margin:0 auto 48px;line-height:1.7}
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+footer{padding:32px 48px;background:${bgMuted};border-top:1px solid ${border};display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-logo{font-weight:900;font-size:1.1rem;letter-spacing:-.03em;color:${textMid}}
+.footer-domain{font-size:.85rem;color:${textDim}}
+.footer-credit{font-size:.78rem;color:${textDim}}
+.footer-credit a{color:${primary};text-decoration:none;font-weight:700}
+.footer-credit a:hover{text-decoration:underline}
+
+/* ── AI badge ─────────────────────────────────────────────────────────── */
+.ai-badge{position:fixed;bottom:24px;right:24px;display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;font-size:.7rem;font-weight:700;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.3);color:#00f5a0;z-index:300;backdrop-filter:blur(12px)}
 .fallback-badge{background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.3);color:#ffc800}
-.claude-credit{font-size:10px;font-weight:500;opacity:0.7;letter-spacing:0.02em;padding-left:4px;border-left:1px solid rgba(0,245,160,0.3);margin-left:4px}
-h1{font-size:clamp(2.8rem,7vw,6rem);font-weight:900;line-height:1.05;letter-spacing:-.03em;margin-bottom:20px}
-.subhead{font-size:clamp(1rem,2vw,1.3rem);color:#888;max-width:600px;line-height:1.6;margin-bottom:40px}
-.cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.cta-primary{padding:16px 36px;border-radius:12px;font-weight:800;font-size:1rem;text-decoration:none;color:#000;background:linear-gradient(135deg,${primary},${secondary});transition:transform .15s,box-shadow .15s}
-.cta-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(${r},${g},${b},.35)}
-.cta-secondary{padding:16px 36px;border-radius:12px;font-weight:700;font-size:1rem;text-decoration:none;color:#f0f0f0;border:1px solid #333;transition:border-color .15s}
-.cta-secondary:hover{border-color:${primary}}
-.services{padding:80px 24px;max-width:1100px;margin:0 auto}
-.services h2{font-size:clamp(1.8rem,4vw,3rem);font-weight:900;text-align:center;margin-bottom:12px;letter-spacing:-.02em}
-.services-sub{text-align:center;color:#666;margin-bottom:48px;font-size:1rem}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
-.card{background:#0e0e0e;border:1px solid #1a1a1a;border-radius:16px;padding:28px;transition:border-color .2s,transform .2s}
-.card:hover{border-color:rgba(${r},${g},${b},.3);transform:translateY(-3px)}
-.card-title{font-size:1.05rem;font-weight:700;margin-bottom:10px;color:#f0f0f0}
-.card-desc{font-size:.9rem;color:#666;line-height:1.6}
-.closing{padding:80px 24px;text-align:center}
-.closing h2{font-size:clamp(2rem,5vw,4rem);font-weight:900;line-height:1.1;letter-spacing:-.03em;margin-bottom:24px}
-.banner{position:fixed;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:rgba(10,10,10,.97);border-top:1px solid #1f1f1f;z-index:200;backdrop-filter:blur(12px)}
-.bt{font-size:.85rem;color:#888}
-.bt strong{color:#f0f0f0}
-.bc{padding:9px 22px;border-radius:8px;font-weight:700;font-size:.85rem;text-decoration:none;color:#000;background:linear-gradient(135deg,${primary},${secondary})}
-</style></head><body>
-<nav>
-  <div class="logo">${data.businessName}</div>
-  <a class="nav-cta" href="#">${copy.cta}</a>
+.claude-credit{font-size:.68rem;font-weight:500;opacity:.75;padding-left:8px;border-left:1px solid rgba(0,245,160,.3);margin-left:4px}
+
+/* ── Sticky banner ────────────────────────────────────────────────────── */
+.banner{position:fixed;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:14px 36px;background:${navBg};border-top:1px solid ${navBdr};z-index:250;backdrop-filter:blur(16px)}
+.banner-text{font-size:.85rem;color:${textMid}}
+.banner-text strong{color:${textMain}}
+.banner-cta{padding:10px 24px;border-radius:10px;font-weight:700;font-size:.875rem;text-decoration:none;color:#fff;background:${primary};transition:opacity .15s,transform .15s}
+.banner-cta:hover{opacity:.88;transform:translateY(-1px)}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media(max-width:1024px){.about-inner{grid-template-columns:1fr;gap:48px}}
+@media(max-width:768px){
+  nav{padding:0 20px}
+  .nav-links{display:none}
+  .hero{padding:120px 20px 80px}
+  h1.hero-headline{font-size:clamp(2.6rem,10vw,4.5rem)}
+  .services-grid{grid-template-columns:1fr}
+  .trust-inner{gap:0}
+  .stat-item{min-width:50%;padding:16px 12px}
+  .stat-div{display:none}
+  footer{flex-direction:column;align-items:flex-start;padding:24px 20px}
+  .banner{padding:12px 20px}
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav id="nav">
+  <a href="#" class="logo-wrap">${logoHTML}</a>
+  <div class="nav-links">
+    <a href="#services">Services</a>
+    <a href="#about">About</a>
+    <a href="#contact">Contact</a>
+  </div>
+  <a href="#contact" class="nav-cta">${copy.cta} <span class="btn-arrow">→</span></a>
 </nav>
+
 ${aiBadge}
+
+<!-- Hero -->
 <section class="hero">
-  <div class="hero-orb hero-orb-1"></div>
-  <div class="hero-orb hero-orb-2"></div>
-  <div class="badge">✦ Redesign Preview by RandyBuilds</div>
-  <h1><span class="grad">${copy.headline}</span></h1>
-  <p class="subhead">${copy.subhead}</p>
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="hero-eyebrow">✦ Premium Redesign Preview by RandyBuilds</div>
+  <h1 class="hero-headline"><span class="grad">${copy.headline}</span></h1>
+  <p class="hero-sub">${copy.subhead}</p>
   <div class="cta-row">
-    <a class="cta-primary" href="#">${copy.cta}</a>
-    <a class="cta-secondary" href="#">${copy.ctaSecondary}</a>
+    <a href="#contact" class="btn-primary">${copy.cta} <span class="btn-arrow">→</span></a>
+    <a href="#services" class="btn-secondary">${copy.ctaSecondary} <span class="btn-arrow">↓</span></a>
   </div>
-  <div class="hero-mockup" aria-hidden="true">
-    <div class="mock-bar">
-      <span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span>
-      <span class="mock-url">${data.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}</span>
+  ${contactPill}
+</section>
+
+<!-- Trust bar -->
+<section class="trust reveal">
+  <div class="trust-inner">${statsHTML}</div>
+</section>
+
+<!-- Services -->
+<section class="services-section" id="services">
+  <div class="reveal">
+    <div class="section-label">What We Do</div>
+    <h2 class="section-title">Services built to <span style="color:${primary}">perform</span></h2>
+    <p class="section-sub">Every service is designed to deliver results — not just check a box.</p>
+  </div>
+  <div class="services-grid">${servicesHTML}</div>
+</section>
+
+<!-- About -->
+<section class="about" id="about">
+  <div class="about-inner">
+    <div class="about-text reveal">
+      <div class="section-label">Our Story</div>
+      <h2 class="about-headline">Built on craft.<br>Backed by results.</h2>
+      <p class="about-body">${data.description || `${data.businessName} has been delivering exceptional results for clients who demand the best. Every project we take on is treated with precision, care, and a commitment to excellence that shows in the work.`}</p>
     </div>
-    <div class="mock-body">
-      <div class="mock-row mock-row-wide"></div>
-      <div class="mock-row mock-row-med"></div>
-      <div class="mock-row mock-row-narrow"></div>
-      <div class="mock-cards">
-        <div class="mock-card"><div class="mock-card-icon" style="background:linear-gradient(135deg,${primary},${secondary})"></div><div class="mock-card-lines"><div class="mock-line"></div><div class="mock-line short"></div></div></div>
-        <div class="mock-card"><div class="mock-card-icon" style="background:linear-gradient(135deg,${secondary},${primary})"></div><div class="mock-card-lines"><div class="mock-line"></div><div class="mock-line short"></div></div></div>
-        <div class="mock-card"><div class="mock-card-icon" style="background:linear-gradient(135deg,${primary}88,${secondary}88)"></div><div class="mock-card-lines"><div class="mock-line"></div><div class="mock-line short"></div></div></div>
-      </div>
+    <div class="about-visual reveal">
+      <div class="about-stat-row"><div class="about-stat-num" style="color:${primary}">100%</div><div class="about-stat-desc">Client satisfaction rate — we don't walk away until the job is done right.</div></div>
+      <div class="about-stat-row"><div class="about-stat-num" style="color:${primary}">Fast</div><div class="about-stat-desc">Quick turnaround without cutting corners. Efficient, professional, reliable.</div></div>
+      <div class="about-stat-row"><div class="about-stat-num" style="color:${primary}">${data.phone ? data.phone : "Local"}</div><div class="about-stat-desc">${data.phone ? "Call us directly — real people, no runaround." : `Proudly serving ${data.address ? data.address.split(",").slice(-2).join(",").trim() : "the local community"}.`}</div></div>
     </div>
   </div>
 </section>
-<section class="services">
-  <h2>What We <span class="grad">Do Best</span></h2>
-  <p class="services-sub">Everything you need, nothing you don't.</p>
-  <div class="grid">${servicesHTML}</div>
-</section>
-<section class="closing">
-  <h2><span class="grad">${copy.closingHeadline}</span></h2>
-  <div class="cta-row" style="margin-top:32px">
-    <a class="cta-primary" href="#">${copy.cta}</a>
-    <a class="cta-secondary" href="#">${copy.ctaSecondary}</a>
+
+<!-- CTA Closing -->
+<section class="closing" id="contact">
+  <div class="closing-orb"></div>
+  <div class="reveal">
+    <h2 class="closing-headline">${copy.closingHeadline}</h2>
+    <p class="closing-sub">Ready to see results? Let's get started — no pressure, no runaround.</p>
+    <div class="cta-row">
+      <a href="${data.email ? `mailto:${data.email}` : data.phone ? `tel:${data.phone.replace(/\D/g,"")}` : "#"}" class="btn-primary">${copy.cta} <span class="btn-arrow">→</span></a>
+      <a href="${data.url}" target="_blank" rel="noopener" class="btn-secondary">View Current Site <span class="btn-arrow">↗</span></a>
+    </div>
   </div>
 </section>
+
+<!-- Footer -->
+<footer>
+  <div>
+    <div class="footer-logo">${data.businessName}</div>
+    <div class="footer-domain">${domain}</div>
+  </div>
+  <div class="footer-credit">Preview built by <a href="https://randybuilds.ca" target="_blank">RandyBuilds</a> — Alberta web design from $800</div>
+</footer>
+
+<!-- Sticky banner -->
 <div class="banner">
-  <div class="bt">👀 <strong>Free preview.</strong> This is what your site could look like — built by RandyBuilds.</div>
-  <a href="/" class="bc">Buy This Site →</a>
+  <div class="banner-text">👀 <strong>Free redesign preview.</strong> This is what your site could look like in 2 weeks.</div>
+  <a href="https://randybuilds.ca" target="_blank" class="banner-cta">Get This Site →</a>
 </div>
-</body></html>`;
+
+<script>
+// ── Scroll reveal ────────────────────────────────────────────────────────
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add("visible");
+      // Also reveal child cards
+      e.target.querySelectorAll(".card").forEach(c => c.classList.add("visible"));
+    }
+  });
+}, { threshold: 0.12 });
+document.querySelectorAll(".reveal, .services-grid").forEach(el => io.observe(el));
+
+// ── Nav shadow on scroll ─────────────────────────────────────────────────
+const nav = document.getElementById("nav");
+window.addEventListener("scroll", () => {
+  nav.classList.toggle("scrolled", window.scrollY > 20);
+}, { passive: true });
+
+// ── Shimmer headline on hover ─────────────────────────────────────────────
+const hl = document.querySelector(".hero-headline .grad");
+if (hl) hl.addEventListener("mouseenter", () => {
+  hl.style.animationDuration = "1s";
+});
+if (hl) hl.addEventListener("mouseleave", () => {
+  hl.style.animationDuration = "4s";
+});
+</script>
+</body>
+</html>`;
 }
 
-// ─── Slug generator — short base62, collision-proof ──────────────────────────
 function generateSlug(businessName: string): string {
   // 8-char base62 from timestamp + random — short enough to text, unique enough to not collide
   const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
