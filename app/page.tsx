@@ -112,8 +112,9 @@ export default function Home() {
         }
         a{color:inherit;text-decoration:none}
         ::selection{background:#c8a96e33;color:#e8e4dc}
-        input,button{font-family:inherit;cursor:none}
-        input{outline:none}
+        input,button{font-family:inherit}
+        input{outline:none;pointer-events:auto}
+        button{pointer-events:auto}
         input::placeholder{color:rgba(232,228,220,.3)}
 
         /* Cursor */
@@ -221,7 +222,7 @@ export default function Home() {
           border:none;padding:0 28px;
           font-family:'Syne',sans-serif;font-size:.72rem;font-weight:800;
           letter-spacing:.08em;text-transform:uppercase;
-          cursor:none;white-space:nowrap;
+          cursor:pointer;white-space:nowrap;
           transition:opacity .15s,background .15s;
           display:flex;align-items:center;gap:8px;
           flex-shrink:0;
