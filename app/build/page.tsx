@@ -80,12 +80,18 @@ export default function BuilderPage() {
 
   // Update iframe when html changes
   useEffect(() => {
-    if (!iframeRef.current || !state.html) return;
-    const doc = iframeRef.current.contentDocument;
-    if (!doc) return;
-    doc.open();
-    doc.write(state.html);
-    doc.close();
+    if (!state.html) return;
+    const render = () => {
+      if (!iframeRef.current) return;
+      const doc = iframeRef.current.contentDocument;
+      if (!doc) return;
+      doc.open();
+      doc.write(state.html);
+      doc.close();
+    };
+    // rAF ensures DOM is painted before we write
+    const raf = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(raf);
   }, [state.html]);
 
   // Device preview dimensions
