@@ -114,10 +114,7 @@ export default function Home() {
       const r1 = await fetch("/api/scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: clean }) });
       const d1 = await r1.json();
       if (!r1.ok) throw new Error(d1.error || "Scrape failed");
-      const r2 = await fetch("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scraped: d1 }) });
-      const d2 = await r2.json();
-      if (!r2.ok) throw new Error(d2.error || "Redesign failed");
-      setResult(d2);
+      setResult(d1);
       setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
