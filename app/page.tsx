@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
-// ─── Typewriter ────────────────────────────────────────────────────────────────
+// ─── Typewriter ───────────────────────────────────────────────────────────────
 const WORDS = ["converts.", "gets you calls.", "builds trust.", "closes deals.", "gets found."];
 function TypeCycle() {
   const [idx, setIdx] = useState(0);
@@ -10,566 +10,491 @@ function TypeCycle() {
   useEffect(() => {
     const word = WORDS[idx];
     let t: ReturnType<typeof setTimeout>;
-    if (!deleting && displayed.length < word.length) t = setTimeout(() => setDisplayed(word.slice(0, displayed.length + 1)), 75);
-    else if (!deleting && displayed.length === word.length) t = setTimeout(() => setDeleting(true), 2000);
-    else if (deleting && displayed.length > 0) t = setTimeout(() => setDisplayed(displayed.slice(0, -1)), 35);
+    if (!deleting && displayed.length < word.length) t = setTimeout(() => setDisplayed(word.slice(0, displayed.length + 1)), 72);
+    else if (!deleting && displayed.length === word.length) t = setTimeout(() => setDeleting(true), 2200);
+    else if (deleting && displayed.length > 0) t = setTimeout(() => setDisplayed(displayed.slice(0, -1)), 32);
     else { setDeleting(false); setIdx(i => (i + 1) % WORDS.length); }
     return () => clearTimeout(t);
   }, [displayed, deleting, idx]);
-  return <span style={{ color: "#c8a96e" }}>{displayed}<span style={{ animation: "blink 1s step-end infinite", color: "#c8a96e" }}>|</span></span>;
+  return (
+    <span style={{ color: "#c8a96e", fontStyle: "italic" }}>
+      {displayed}
+      <span style={{ animation: "blink 1s step-end infinite", color: "#c8a96e", marginLeft: 1 }}>|</span>
+    </span>
+  );
 }
 
-// ─── CountUp ──────────────────────────────────────────────────────────────────
-function CountUp({ end, suffix = "", prefix = "", duration = 1800 }: { end: number; suffix?: string; prefix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
-  useEffect(() => {
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !started.current) {
-        started.current = true;
-        const start = Date.now();
-        const tick = () => {
-          const p = Math.min((Date.now() - start) / duration, 1);
-          const eased = 1 - Math.pow(1 - p, 3);
-          setCount(Math.floor(eased * end));
-          if (p < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }
-    });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, [end, duration]);
-  return <span ref={ref}>{prefix}{count}{suffix}</span>;
-}
-
-// ─── Portfolio items ───────────────────────────────────────────────────────────
-const PORTFOLIO = [
-  {
-    name: "Apex Electrical",
-    type: "Electrical Contractor",
-    location: "Cochrane, AB",
-    tag: "Trades",
-    color: "#c8a96e",
-    description: "Family-run electrical company with zero web presence. Booked 3 new clients in first month after launch.",
-    metrics: ["3 new clients / month 1", "Mobile-first design", "Google-ready from day one"],
-  },
-  {
-    name: "Northern Edge Landscaping",
-    type: "Landscaping & Snow Removal",
-    location: "Red Deer, AB",
-    tag: "Seasonal Services",
-    color: "#7cb87c",
-    description: "Operating on Facebook only. Built a full 5-page site with online quote form. Quote requests tripled.",
-    metrics: ["3x quote requests", "Quote form integration", "Seasonal service pages"],
-  },
-  {
-    name: "Firebag Mechanical",
-    type: "Industrial Mechanical Services",
-    location: "Fort McMurray, AB",
-    tag: "Oilfield",
-    color: "#6e9ec8",
-    description: "Field services company needing a credible web presence for procurement bids. Clean, professional, fast.",
-    metrics: ["Passed vendor screening", "PDF-ready brochure page", "2-week delivery"],
-  },
-];
-
-// ─── Process steps ─────────────────────────────────────────────────────────────
-const PROCESS = [
-  { num: "01", title: "You paste your URL", body: "Or just describe your business. I analyze what exists — or start from scratch if there's nothing." },
-  { num: "02", title: "AI builds a live preview", body: "In 60 seconds you see a real redesign of your site — real copy, real layout, shareable link." },
-  { num: "03", title: "We align on the vision", body: "Quick call or message. I show you the direction and we lock in the details before I build." },
-  { num: "04", title: "Live in 2 weeks", body: "Full site, hosted, handed over. You walk away with a website that actually works." },
-];
-
-// ─── FAQ ──────────────────────────────────────────────────────────────────────
-const FAQ = [
-  { q: "Do I need anything to get started?", a: "Just your business name and an idea of what you do. If you have an existing site, even better — I'll tear it apart and rebuild it properly." },
-  { q: "How long does it really take?", a: "Standard builds: 10–14 days. Rush builds available. I don't disappear on you — you'll hear from me every few days with progress." },
-  { q: "What if I hate it?", a: "We do a revision round after your first look. I want you to love it. If something's off, we fix it — that's part of the deal." },
-  { q: "Do you do hosting and domain setup?", a: "Yes. I handle everything — domain config, DNS, SSL, hosting. You don't need to touch a single technical setting." },
-  { q: "What about updates after launch?", a: "Monthly retainer plans start at $150/month. Covers minor updates, hosting management, and priority support. Optional but most clients stay on." },
-];
-
-// ─── Main Component ────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<null | { previewUrl: string; previewHtml?: string; businessName: string; slug?: string }>(null);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const previewRef = useRef<HTMLIFrameElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Cursor
+  useEffect(() => {
+    const dot = document.getElementById("cur-dot");
+    const ring = document.getElementById("cur-ring");
+    if (!dot || !ring) return;
+    let mx = 0, my = 0, rx = 0, ry = 0;
+    const onMove = (e: MouseEvent) => {
+      mx = e.clientX; my = e.clientY;
+      dot.style.left = mx + "px"; dot.style.top = my + "px";
+    };
+    document.addEventListener("mousemove", onMove);
+    let raf: number;
+    const loop = () => {
+      rx += (mx - rx) * 0.11; ry += (my - ry) * 0.11;
+      ring.style.left = Math.round(rx) + "px"; ring.style.top = Math.round(ry) + "px";
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => { document.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
+  }, []);
+
+  // Nav compact on scroll
+  useEffect(() => {
+    const nav = document.getElementById("rbnav");
+    if (!nav) return;
+    const onScroll = () => nav.classList.toggle("compact", window.scrollY > 60);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Reveal on scroll
+  useEffect(() => {
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          (e.target as HTMLElement).classList.add("in");
+        }
+      });
+    }, { threshold: 0.06, rootMargin: "0px 0px -32px 0px" });
+    document.querySelectorAll(".rv").forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url) return;
-    setLoading(true);
+    if (!url.trim()) { inputRef.current?.focus(); return; }
     setError("");
-    setResult(null);
+    setLoading(true);
     try {
-      let clean = url.trim();
-      if (!clean.startsWith("http")) clean = "https://" + clean;
-      const r1 = await fetch("/api/scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: clean }) });
-      const d1 = await r1.json();
-      if (!r1.ok) throw new Error(d1.error || "Scrape failed");
-      setResult(d1);
-      setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      let u = url.trim();
+      if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+      const res = await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: u }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.previewUrl) throw new Error(data.error || "Something went wrong");
+      window.location.href = data.previewUrl;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Could not generate preview. Try again.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [url]);
 
   return (
-    <div style={{ background: "#0c0b09", color: "#e8e0d0", fontFamily: "'Inter', -apple-system, sans-serif", overflowX: "hidden" }}>
+    <>
+      {/* ── Global styles ────────────────────────────────────────────────────── */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        ::selection { background: rgba(200,169,110,0.3); color: #e8e0d0; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #0c0b09; }
-        ::-webkit-scrollbar-thumb { background: #2a2820; border-radius: 2px; }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
-        .fade-up { animation: fadeUp 0.7s ease forwards; }
-        .spinner { animation: spin 0.8s linear infinite; }
-        .nav-link { color: rgba(232,224,208,0.5); font-size: 14px; font-weight: 500; text-decoration: none; transition: color 0.2s; letter-spacing: 0.01em; }
-        .nav-link:hover { color: #e8e0d0; }
-        .btn-primary {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 28px; border-radius: 10px; font-weight: 700; font-size: 15px;
-          background: #c8a96e; color: #0c0b09; border: none; cursor: pointer;
-          text-decoration: none; transition: all 0.2s; letter-spacing: -0.01em;
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500&display=swap');
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        html{font-size:16px;scroll-behavior:smooth}
+        body{
+          background:#0a0a08;color:#e8e4dc;
+          font-family:'Inter',system-ui,sans-serif;
+          font-weight:300;overflow-x:hidden;cursor:none;
+          -webkit-font-smoothing:antialiased;
         }
-        .btn-primary:hover { background: #d4b87e; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,169,110,0.25); }
-        .btn-secondary {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 28px; border-radius: 10px; font-weight: 600; font-size: 15px;
-          background: transparent; color: rgba(232,224,208,0.7); border: 1px solid rgba(232,224,208,0.15);
-          cursor: pointer; text-decoration: none; transition: all 0.2s;
+        a{color:inherit;text-decoration:none}
+        ::selection{background:#c8a96e33;color:#e8e4dc}
+        input,button{font-family:inherit;cursor:none}
+        input{outline:none}
+        input::placeholder{color:rgba(232,228,220,.3)}
+
+        /* Cursor */
+        #cur-dot{position:fixed;width:7px;height:7px;background:#e8e4dc;border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .15s,height .15s}
+        #cur-ring{position:fixed;width:38px;height:38px;border:1px solid rgba(232,228,220,.3);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width .25s,height .25s}
+        a:hover ~ #cur-ring,button:hover ~ #cur-ring{width:60px;height:60px}
+
+        /* Nav */
+        #rbnav{
+          position:fixed;top:0;left:0;right:0;z-index:500;
+          display:flex;align-items:center;justify-content:space-between;
+          padding:32px 56px;
+          transition:padding .4s cubic-bezier(.16,1,.3,1),background .3s,border-color .3s;
         }
-        .btn-secondary:hover { border-color: rgba(232,224,208,0.35); color: #e8e0d0; }
-        .card { background: #141210; border: 1px solid #2a2820; border-radius: 16px; transition: border-color 0.2s, transform 0.2s; }
-        .card:hover { border-color: rgba(200,169,110,0.3); transform: translateY(-2px); }
-        .tag { display: inline-block; padding: 4px 12px; border-radius: 100px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
-        .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #c8a96e; margin-bottom: 16px; }
-        .divider { width: 100%; height: 1px; background: linear-gradient(to right, transparent, #2a2820, transparent); }
-        input, textarea { outline: none; }
-        input::placeholder { color: rgba(232,224,208,0.3); }
-        .url-input:focus { border-color: rgba(200,169,110,0.5) !important; }
+        #rbnav.compact{padding:18px 56px;background:rgba(10,10,8,.95);backdrop-filter:blur(24px);border-bottom:1px solid rgba(255,255,255,.06)}
+        .nav-logo{font-family:'Syne',sans-serif;font-size:.9rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#e8e4dc}
+        .nav-logo span{color:#c8a96e}
+        .nav-links{display:flex;align-items:center;gap:40px}
+        .nav-link{font-family:'Syne',sans-serif;font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(232,228,220,.4);transition:color .2s}
+        .nav-link:hover{color:#e8e4dc}
+        .nav-cta{font-family:'Syne',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0a0a08;background:#c8a96e;padding:10px 24px;border-radius:100px;transition:opacity .15s,transform .15s}
+        .nav-cta:hover{opacity:.88;transform:translateY(-1px)}
+        @media(max-width:768px){#rbnav{padding:20px 24px}#rbnav.compact{padding:14px 24px}.nav-links{gap:20px}.nav-link{display:none}}
+
+        /* Hero */
+        .hero{
+          min-height:100svh;
+          display:flex;flex-direction:column;justify-content:flex-end;
+          padding:0 56px 80px;
+          position:relative;overflow:hidden;
+        }
+        .hero-noise{
+          position:absolute;inset:0;z-index:0;pointer-events:none;
+          background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+          opacity:.5;
+        }
+        .hero-glow{position:absolute;width:800px;height:800px;top:-200px;left:50%;transform:translateX(-50%);background:radial-gradient(circle,rgba(200,169,110,.07) 0%,transparent 65%);pointer-events:none;z-index:0}
+        .hero-grid{
+          position:absolute;inset:0;z-index:0;
+          background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+          background-size:80px 80px;
+          mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,black,transparent);
+        }
+        .hero-eyebrow{
+          position:relative;z-index:2;
+          font-family:'Syne',sans-serif;font-size:.68rem;font-weight:600;
+          letter-spacing:.16em;text-transform:uppercase;color:rgba(232,228,220,.35);
+          display:flex;align-items:center;gap:14px;margin-bottom:36px;
+          animation:fadeUp .8s cubic-bezier(.16,1,.3,1) both;
+        }
+        .hero-eyebrow::before{content:'';display:block;width:32px;height:1px;background:#c8a96e;opacity:.6}
+        .hero-headline{
+          position:relative;z-index:2;
+          font-family:'Instrument Serif',Georgia,serif;
+          font-size:clamp(3rem,8vw,8.5rem);
+          font-weight:400;line-height:.95;letter-spacing:-.03em;
+          color:#e8e4dc;margin-bottom:0;
+          animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .08s both;
+        }
+        .hero-headline em{font-style:italic;color:#c8a96e}
+        .hero-bottom{
+          position:relative;z-index:2;
+          display:grid;grid-template-columns:1fr 520px;
+          gap:60px;align-items:end;
+          margin-top:64px;
+        }
+        .hero-sub{
+          font-size:1rem;color:rgba(232,228,220,.45);
+          line-height:1.8;font-weight:300;
+          animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .16s both;
+        }
+
+        /* URL Form — the centerpiece */
+        .url-form-wrap{
+          animation:fadeUp .9s cubic-bezier(.16,1,.3,1) .22s both;
+        }
+        .url-form-label{
+          font-family:'Syne',sans-serif;font-size:.65rem;font-weight:600;
+          letter-spacing:.12em;text-transform:uppercase;
+          color:rgba(232,228,220,.3);margin-bottom:14px;display:block;
+        }
+        .url-form{
+          display:flex;align-items:stretch;gap:0;
+          background:#111110;
+          border:1px solid rgba(255,255,255,.1);
+          border-radius:14px;overflow:hidden;
+          transition:border-color .25s;
+        }
+        .url-form:focus-within{border-color:rgba(200,169,110,.45)}
+        .url-form:focus-within .url-icon{color:#c8a96e}
+        .url-icon{
+          display:flex;align-items:center;padding:0 18px;
+          color:rgba(232,228,220,.2);font-size:.9rem;
+          flex-shrink:0;transition:color .25s;
+          font-family:'Syne',sans-serif;font-size:.72rem;
+          letter-spacing:.04em;border-right:1px solid rgba(255,255,255,.07);
+        }
+        .url-input{
+          flex:1;background:transparent;border:none;
+          padding:18px 20px;font-size:.95rem;font-weight:300;
+          color:#e8e4dc;min-width:0;
+        }
+        .url-submit{
+          background:#c8a96e;color:#0a0a08;
+          border:none;padding:0 28px;
+          font-family:'Syne',sans-serif;font-size:.72rem;font-weight:800;
+          letter-spacing:.08em;text-transform:uppercase;
+          cursor:none;white-space:nowrap;
+          transition:opacity .15s,background .15s;
+          display:flex;align-items:center;gap:8px;
+          flex-shrink:0;
+        }
+        .url-submit:hover:not(:disabled){opacity:.88}
+        .url-submit:disabled{opacity:.5}
+        .url-error{
+          font-size:.78rem;color:#e07070;margin-top:10px;
+          font-weight:300;padding-left:4px;
+        }
+        .url-hint{
+          font-size:.72rem;color:rgba(232,228,220,.2);
+          margin-top:10px;padding-left:4px;font-weight:300;
+        }
+        @media(max-width:900px){.hero-bottom{grid-template-columns:1fr;gap:40px}.hero{padding:0 24px 64px}}
+        @media(max-width:640px){.hero-headline{font-size:clamp(2.8rem,12vw,5rem)}}
+
+        /* Ticker */
+        .ticker-wrap{overflow:hidden;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);padding:16px 0;background:#080807}
+        .ticker-track{display:flex;width:max-content;animation:marquee 32s linear infinite}
+        .ticker-item{display:inline-flex;align-items:center;gap:10px;padding:0 32px;font-family:'Syne',sans-serif;font-size:.65rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(232,228,220,.22);white-space:nowrap}
+        .ticker-dot{color:#c8a96e;opacity:.5}
+
+        /* How it works */
+        .how{padding:160px 56px;max-width:1200px;margin:0 auto;border-bottom:1px solid rgba(255,255,255,.06)}
+        .section-eyebrow{font-family:'Syne',sans-serif;font-size:.65rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#c8a96e;margin-bottom:20px;display:block}
+        .section-headline{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(2.2rem,4.5vw,4rem);font-weight:400;line-height:1.1;letter-spacing:-.025em;color:#e8e4dc;margin-bottom:80px}
+        .section-headline em{font-style:italic;color:rgba(232,228,220,.5)}
+        .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid rgba(255,255,255,.07);border-radius:20px;overflow:hidden}
+        .step{padding:48px 40px;position:relative}
+        .step+.step{border-left:1px solid rgba(255,255,255,.07)}
+        .step-num{font-family:'Instrument Serif',Georgia,serif;font-size:4rem;font-weight:400;font-style:italic;color:rgba(200,169,110,.15);line-height:1;margin-bottom:24px}
+        .step-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#e8e4dc;margin-bottom:12px;letter-spacing:-.01em}
+        .step-desc{font-size:.88rem;color:rgba(232,228,220,.45);line-height:1.75;font-weight:300}
+        @media(max-width:768px){.steps{grid-template-columns:1fr;border-radius:16px}.step+.step{border-left:none;border-top:1px solid rgba(255,255,255,.07)}.how{padding:100px 24px}}
+
+        /* Pricing */
+        .pricing{padding:160px 56px;max-width:1200px;margin:0 auto;border-bottom:1px solid rgba(255,255,255,.06)}
+        .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:0}
+        .price-card{
+          padding:48px 36px;
+          border:1px solid rgba(255,255,255,.08);
+          border-radius:20px;
+          background:#0e0e0c;
+          position:relative;
+          transition:border-color .25s,transform .25s;
+        }
+        .price-card:hover{border-color:rgba(200,169,110,.25);transform:translateY(-4px)}
+        .price-card.featured{border-color:rgba(200,169,110,.3);background:#111009}
+        .price-card.featured::before{
+          content:'Most Popular';
+          position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+          font-family:'Syne',sans-serif;font-size:.62rem;font-weight:700;
+          letter-spacing:.1em;text-transform:uppercase;
+          color:#0a0a08;background:#c8a96e;
+          padding:5px 16px;border-radius:100px;white-space:nowrap;
+        }
+        .price-tier{font-family:'Syne',sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(232,228,220,.35);margin-bottom:20px}
+        .price-amount{font-family:'Instrument Serif',Georgia,serif;font-size:3.2rem;font-weight:400;font-style:italic;color:#e8e4dc;line-height:1;margin-bottom:6px}
+        .price-amount span{font-size:1.2rem;font-style:normal;color:rgba(232,228,220,.4);vertical-align:top;margin-top:8px;display:inline-block;margin-right:4px}
+        .price-cycle{font-size:.78rem;color:rgba(232,228,220,.3);font-weight:300;margin-bottom:36px}
+        .price-divider{height:1px;background:rgba(255,255,255,.07);margin-bottom:28px}
+        .price-features{display:flex;flex-direction:column;gap:14px;margin-bottom:40px}
+        .price-feat{display:flex;align-items:flex-start;gap:12px;font-size:.85rem;color:rgba(232,228,220,.55);line-height:1.5;font-weight:300}
+        .price-feat::before{content:'—';color:#c8a96e;flex-shrink:0;font-style:italic}
+        .price-btn{
+          display:block;text-align:center;
+          padding:14px 24px;border-radius:100px;
+          font-family:'Syne',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+          transition:opacity .15s,transform .15s,background .15s,color .15s;
+        }
+        .price-btn-outline{border:1px solid rgba(255,255,255,.15);color:rgba(232,228,220,.6)}
+        .price-btn-outline:hover{border-color:rgba(200,169,110,.4);color:#c8a96e}
+        .price-btn-fill{background:#c8a96e;color:#0a0a08}
+        .price-btn-fill:hover{opacity:.88;transform:translateY(-1px)}
+        @media(max-width:900px){.pricing-grid{grid-template-columns:1fr;max-width:480px}.pricing{padding:100px 24px}}
+
+        /* CTA */
+        .cta-section{
+          padding:180px 56px;
+          text-align:center;position:relative;overflow:hidden;
+        }
+        .cta-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:700px;height:700px;background:radial-gradient(circle,rgba(200,169,110,.07) 0%,transparent 65%);pointer-events:none}
+        .cta-eyebrow{font-family:'Syne',sans-serif;font-size:.65rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(232,228,220,.3);margin-bottom:40px}
+        .cta-headline{font-family:'Instrument Serif',Georgia,serif;font-size:clamp(2.8rem,7vw,7.5rem);font-weight:400;font-style:italic;line-height:.95;letter-spacing:-.03em;color:#e8e4dc;margin-bottom:56px}
+        .cta-headline em{font-style:normal;color:#c8a96e}
+        .cta-form-wrap{max-width:560px;margin:0 auto}
+        @media(max-width:640px){.cta-section{padding:120px 24px}}
+
+        /* Footer */
+        .footer{
+          padding:48px 56px;border-top:1px solid rgba(255,255,255,.07);
+          display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:24px;
+        }
+        .footer-name{font-family:'Syne',sans-serif;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(232,228,220,.35)}
+        .footer-center{font-family:'Syne',sans-serif;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(232,228,220,.18);text-align:center}
+        .footer-right{font-size:.72rem;color:rgba(232,228,220,.2);text-align:right;font-weight:300}
+        @media(max-width:640px){.footer{padding:32px 24px;grid-template-columns:1fr}.footer-center,.footer-right{text-align:left}}
+
+        /* Reveal */
+        .rv{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+        .rv.in{opacity:1;transform:none}
+        .rv-l{opacity:0;transform:translateX(-28px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+        .rv-l.in{opacity:1;transform:none}
+
+        /* Animations */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+        @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
       `}</style>
 
-      {/* ── NAV ──────────────────────────────────────────────────────────────── */}
-      <nav style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 32px", height: 64,
-        background: "rgba(12,11,9,0.9)", backdropFilter: "blur(20px)",
-        borderBottom: "1px solid #1e1c18",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#c8a96e", animation: "pulse 2s ease-in-out infinite" }} />
-          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: "-0.03em", color: "#e8e0d0" }}>
-            randy<span style={{ color: "#c8a96e" }}>builds</span>
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 32 }} className="nav-links-desktop">
-          <a href="#work" className="nav-link">Work</a>
-          <a href="#process" className="nav-link">Process</a>
+      {/* Cursor */}
+      <div id="cur-dot" />
+      <div id="cur-ring" />
+
+      {/* Nav */}
+      <nav id="rbnav">
+        <a href="/" className="nav-logo">Randy<span>Builds</span></a>
+        <div className="nav-links">
+          <a href="#how" className="nav-link">How it works</a>
           <a href="#pricing" className="nav-link">Pricing</a>
-          <a href="#faq" className="nav-link">FAQ</a>
+          <a href="mailto:hello@randybuilds.ca" className="nav-cta">Get a Site</a>
         </div>
-        <a href="#preview-tool" className="btn-primary" style={{ padding: "10px 20px", fontSize: 13 }}>
-          Get Your Preview →
-        </a>
       </nav>
 
-      {/* ── HERO ─────────────────────────────────────────────────────────────── */}
-      <section style={{
-        minHeight: "100vh", display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        padding: "120px 24px 80px", textAlign: "center", position: "relative",
-      }}>
-        {/* Subtle grain texture overlay */}
-        <div style={{
-          position: "absolute", inset: 0, pointerEvents: "none",
-          backgroundImage: "radial-gradient(ellipse at 50% 40%, rgba(200,169,110,0.05) 0%, transparent 60%)",
-        }} />
+      {/* ── HERO ────────────────────────────────────────────────────────────── */}
+      <section className="hero">
+        <div className="hero-noise" />
+        <div className="hero-glow" />
+        <div className="hero-grid" />
 
-        <div style={{ position: "relative", zIndex: 1, maxWidth: 760, margin: "0 auto" }}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            padding: "6px 16px", borderRadius: 100, marginBottom: 32,
-            background: "rgba(200,169,110,0.08)", border: "1px solid rgba(200,169,110,0.2)",
-            fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#c8a96e",
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#c8a96e", animation: "pulse 2s ease-in-out infinite" }} />
-            Alberta Web Design — Previews in 60 Seconds
-          </div>
+        <div className="hero-eyebrow">Alberta web design — from $800 CAD</div>
 
-          <h1 style={{
-            fontSize: "clamp(3rem, 7vw, 5.5rem)", fontWeight: 900, lineHeight: 1.05,
-            letterSpacing: "-0.04em", color: "#e8e0d0", marginBottom: 28,
-          }}>
-            Your website should<br />
-            be one that&nbsp;
-            <TypeCycle />
-          </h1>
+        <h1 className="hero-headline">
+          Your website<br />
+          <em>actually</em><br />
+          <TypeCycle />
+        </h1>
 
-          <p style={{
-            fontSize: "clamp(1rem, 2vw, 1.2rem)", color: "rgba(232,224,208,0.55)",
-            maxWidth: 560, margin: "0 auto 48px", lineHeight: 1.65, fontWeight: 400,
-          }}>
-            Paste your URL and see a live redesign in 60 seconds. Built for Alberta small businesses that are tired of losing customers to a bad website.
+        <div className="hero-bottom">
+          <p className="hero-sub">
+            We build fast, clean, conversion-ready websites for Alberta small businesses and tradespeople.
+            Drop your current site below — see what it could look like in 60 seconds.
           </p>
 
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <a href="#preview-tool" className="btn-primary">See My Preview →</a>
-            <a href="#work" className="btn-secondary">View Work ↓</a>
-          </div>
-
-          {/* Social proof row */}
-          <div style={{
-            marginTop: 56, display: "flex", alignItems: "center", justifyContent: "center",
-            gap: 32, flexWrap: "wrap",
-          }}>
-            {[
-              { val: "2 weeks", label: "Average delivery" },
-              { val: "$800", label: "Starting price (CAD)" },
-              { val: "100%", label: "Mobile-first" },
-            ].map((s, i) => (
-              <div key={i} style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "#c8a96e", letterSpacing: "-0.03em" }}>{s.val}</div>
-                <div style={{ fontSize: 12, color: "rgba(232,224,208,0.4)", marginTop: 2, fontWeight: 500 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <div style={{ position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(232,224,208,0.2)", fontWeight: 600 }}>scroll</span>
-          <div style={{ width: 1, height: 40, background: "linear-gradient(to bottom, rgba(200,169,110,0.4), transparent)" }} />
-        </div>
-      </section>
-
-      <div className="divider" />
-
-      {/* ── PREVIEW TOOL ─────────────────────────────────────────────────────── */}
-      <section id="preview-tool" style={{ padding: "100px 24px", maxWidth: 760, margin: "0 auto" }}>
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <div className="section-label">The Tool</div>
-          <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em", marginBottom: 16 }}>
-            Paste your URL.<br />See your new site.
-          </h2>
-          <p style={{ color: "rgba(232,224,208,0.5)", fontSize: 16, lineHeight: 1.6 }}>
-            No account. No credit card. Just your URL and 60 seconds.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div style={{
-            display: "flex", flexDirection: "column", gap: 12,
-            background: "#141210", border: "1px solid #2a2820", borderRadius: 16, padding: 16,
-          }}>
-            <input
-              className="url-input"
-              type="text"
-              placeholder="yourbusiness.com"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              style={{
-                width: "100%", padding: "16px 20px", fontSize: 17, fontWeight: 500,
-                background: "#0c0b09", border: "1px solid #2a2820", borderRadius: 10,
-                color: "#e8e0d0", fontFamily: "inherit", transition: "border-color 0.2s",
-              }}
-            />
-            <button type="submit" disabled={loading || !url} className="btn-primary" style={{
-              width: "100%", justifyContent: "center", padding: "16px",
-              fontSize: 16, opacity: !url ? 0.4 : 1,
-            }}>
-              {loading ? (
-                <>
-                  <svg className="spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                  </svg>
-                  Analyzing your site...
-                </>
-              ) : "Generate My Preview →"}
-            </button>
-          </div>
-        </form>
-
-        {error && (
-          <div style={{ marginTop: 16, padding: 16, borderRadius: 10, background: "rgba(220,80,60,0.1)", border: "1px solid rgba(220,80,60,0.3)", color: "#ff6b6b", fontSize: 14 }}>
-            {error}
-          </div>
-        )}
-
-        {result && (
-          <div ref={previewRef as any} style={{ marginTop: 32 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#e8e0d0" }}>{result.businessName}</div>
-                <div style={{ fontSize: 13, color: "#c8a96e", marginTop: 2 }}>Live redesign preview ✓</div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {result.slug && (
-                  <a href={result.previewUrl} target="_blank" style={{ padding: "8px 16px", borderRadius: 8, background: "#1a1816", border: "1px solid #2a2820", color: "rgba(232,224,208,0.6)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-                    Open Full Screen ↗
-                  </a>
-                )}
-                <a href="#contact" className="btn-primary" style={{ padding: "8px 16px", fontSize: 13 }}>
-                  Get This Built →
-                </a>
-              </div>
-            </div>
-            <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #2a2820", height: 560, position: "relative" }}>
-              <iframe
-                ref={previewRef}
-                srcDoc={result.previewHtml}
-                style={{ width: "100%", height: "100%", border: "none", background: "#fff" }}
-                title="Preview"
-                sandbox="allow-same-origin allow-scripts"
+          <div className="url-form-wrap">
+            <span className="url-form-label">Paste your current website URL</span>
+            <form className="url-form" onSubmit={handleSubmit}>
+              <span className="url-icon">↗</span>
+              <input
+                ref={inputRef}
+                className="url-input"
+                type="text"
+                placeholder="yourbusiness.com"
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                disabled={loading}
               />
-            </div>
-          </div>
-        )}
-      </section>
-
-      <div className="divider" />
-
-      {/* ── WORK / PORTFOLIO ─────────────────────────────────────────────────── */}
-      <section id="work" style={{ padding: "100px 24px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ marginBottom: 64 }}>
-            <div className="section-label">Work</div>
-            <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em", maxWidth: 600 }}>
-              Real Alberta businesses. Real results.
-            </h2>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
-            {PORTFOLIO.map((p, i) => (
-              <div key={i} className="card" style={{ padding: 28 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: 17, color: "#e8e0d0", letterSpacing: "-0.02em" }}>{p.name}</div>
-                    <div style={{ fontSize: 13, color: "rgba(232,224,208,0.45)", marginTop: 2 }}>{p.location}</div>
-                  </div>
-                  <span className="tag" style={{ background: `${p.color}18`, color: p.color, border: `1px solid ${p.color}30` }}>{p.tag}</span>
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.05em", color: "rgba(232,224,208,0.35)", textTransform: "uppercase", marginBottom: 6 }}>{p.type}</div>
-                <p style={{ fontSize: 14, color: "rgba(232,224,208,0.6)", lineHeight: 1.65, marginBottom: 20 }}>{p.description}</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {p.metrics.map((m, j) => (
-                    <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "rgba(232,224,208,0.5)" }}>
-                      <span style={{ color: p.color, fontSize: 14 }}>✓</span> {m}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+              <button className="url-submit" type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <span style={{ display: "inline-block", animation: "spin 1s linear infinite", borderRadius: "50%", width: 14, height: 14, border: "2px solid #0a0a08", borderTopColor: "transparent" }} />
+                    Building
+                  </>
+                ) : "Preview →"}
+              </button>
+            </form>
+            {error && <p className="url-error">{error}</p>}
+            {!error && <p className="url-hint">Free. No account needed. Takes ~30 seconds.</p>}
           </div>
         </div>
       </section>
 
-      <div className="divider" />
+      {/* Ticker */}
+      <div className="ticker-wrap">
+        <div className="ticker-track">
+          {["Web Design", "Alberta", "From $800", "Fast Turnaround", "Mobile First", "SEO Ready", "Trades & Local Business", "Web Design", "Alberta", "From $800", "Fast Turnaround", "Mobile First", "SEO Ready", "Trades & Local Business"].map((t, i) => (
+            <span key={i} className="ticker-item">{t} <span className="ticker-dot">✦</span></span>
+          ))}
+        </div>
+      </div>
 
-      {/* ── STATS BAR ────────────────────────────────────────────────────────── */}
-      <section style={{ padding: "60px 24px", background: "#0e0d0b" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 40, textAlign: "center" }}>
+      {/* ── HOW IT WORKS ────────────────────────────────────────────────────── */}
+      <section className="how rv" id="how">
+        <span className="section-eyebrow">How it works</span>
+        <h2 className="section-headline">Three steps.<br /><em>One great website.</em></h2>
+        <div className="steps">
           {[
-            { end: 14, suffix: " days", label: "Average delivery time" },
-            { end: 100, suffix: "%", label: "Mobile-first builds" },
-            { prefix: "$", end: 800, suffix: "+", label: "Starting price (CAD)" },
-            { end: 2, suffix: " weeks", label: "From deposit to live" },
-          ].map((s, i) => (
-            <div key={i}>
-              <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: "-0.04em", color: "#c8a96e" }}>
-                <CountUp end={s.end} suffix={s.suffix} prefix={s.prefix || ""} />
-              </div>
-              <div style={{ fontSize: 13, color: "rgba(232,224,208,0.4)", marginTop: 4, fontWeight: 500 }}>{s.label}</div>
+            { num: "01", title: "Paste your URL above", desc: "Drop in your current site. Our system scrapes your brand, pulls your photos, reads your services — and builds a live preview in under a minute." },
+            { num: "02", title: "See your redesign live", desc: "A full-page premium preview — your actual business, your actual colors, rebuilt to a standard that makes people trust you the moment they land." },
+            { num: "03", title: "We build the real thing", desc: "Love what you see? We take it from preview to production in 2 weeks. Clean code, fast load, mobile-first, ready to rank on Google." },
+          ].map(s => (
+            <div key={s.num} className="step">
+              <div className="step-num">{s.num}</div>
+              <h3 className="step-title">{s.title}</h3>
+              <p className="step-desc">{s.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <div className="divider" />
-
-      {/* ── PROCESS ──────────────────────────────────────────────────────────── */}
-      <section id="process" style={{ padding: "100px 24px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ marginBottom: 64 }}>
-            <div className="section-label">The Process</div>
-            <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em" }}>
-              From first look to live site<br />in 4 steps.
-            </h2>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 2 }}>
-            {PROCESS.map((p, i) => (
-              <div key={i} style={{ padding: "32px 28px", position: "relative" }}>
-                <div style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#c8a96e", letterSpacing: "0.12em", marginBottom: 16 }}>{p.num}</div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#e8e0d0", letterSpacing: "-0.02em", marginBottom: 10 }}>{p.title}</h3>
-                <p style={{ fontSize: 14, color: "rgba(232,224,208,0.5)", lineHeight: 1.65 }}>{p.body}</p>
-                {i < PROCESS.length - 1 && (
-                  <div style={{ position: "absolute", top: "38px", right: 0, width: 1, height: "calc(100% - 76px)", background: "#2a2820" }} />
-                )}
+      {/* ── PRICING ─────────────────────────────────────────────────────────── */}
+      <section className="pricing rv" id="pricing">
+        <span className="section-eyebrow">Pricing</span>
+        <h2 className="section-headline">Straightforward.<br /><em>No surprises.</em></h2>
+        <div className="pricing-grid">
+          {[
+            {
+              tier: "Starter", amount: "800", suffix: "+", cycle: "one-time",
+              features: ["5-page website", "Mobile-first design", "Contact form", "Google-ready SEO basics", "Delivered in 7 days"],
+              btn: "price-btn-outline", label: "Get Started",
+            },
+            {
+              tier: "Standard", amount: "1,500", suffix: "+", cycle: "one-time", featured: true,
+              features: ["Up to 10 pages", "Booking or quote form", "Full SEO setup", "Google Analytics", "2-week delivery"],
+              btn: "price-btn-fill", label: "Get Started",
+            },
+            {
+              tier: "Retainer", amount: "200", suffix: "/mo", cycle: "monthly",
+              features: ["Hosting management", "Monthly updates", "Speed & security", "Priority support", "Ongoing peace of mind"],
+              btn: "price-btn-outline", label: "Talk to Us",
+            },
+          ].map(p => (
+            <div key={p.tier} className={`price-card rv${p.featured ? " featured" : ""}`}>
+              <div className="price-tier">{p.tier}</div>
+              <div className="price-amount"><span>$</span>{p.amount}<span style={{ fontSize: "1rem" }}>{p.suffix}</span></div>
+              <div className="price-cycle">CAD · {p.cycle}</div>
+              <div className="price-divider" />
+              <div className="price-features">
+                {p.features.map(f => <div key={f} className="price-feat">{f}</div>)}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="divider" />
-
-      {/* ── PRICING ──────────────────────────────────────────────────────────── */}
-      <section id="pricing" style={{ padding: "100px 24px", background: "#0e0d0b" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 64 }}>
-            <div className="section-label">Pricing</div>
-            <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em" }}>
-              Transparent pricing.<br />No surprises.
-            </h2>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-            {[
-              {
-                name: "Starter", price: "$800", per: "CAD", highlight: false,
-                desc: "Perfect for getting online fast. Clean, professional, mobile-ready.",
-                features: ["5 pages", "Mobile-first design", "Contact form", "Basic SEO setup", "Domain + hosting config", "1 revision round"],
-              },
-              {
-                name: "Standard", price: "$1,500", per: "CAD", highlight: true,
-                desc: "More pages, more power. Built to convert visitors into customers.",
-                features: ["Up to 8 pages", "Everything in Starter", "Booking or quote form", "Google Analytics setup", "2 revision rounds", "30-day post-launch support"],
-              },
-              {
-                name: "Retainer", price: "$150", per: "CAD/month", highlight: false,
-                desc: "Keep your site sharp. Updates, hosting, support — handled.",
-                features: ["Monthly content updates", "Hosting management", "Priority response", "Minor design changes", "Performance monitoring", "Cancel anytime"],
-              },
-            ].map((p, i) => (
-              <div key={i} className="card" style={{
-                padding: 28,
-                border: p.highlight ? "1px solid rgba(200,169,110,0.4)" : "1px solid #2a2820",
-                background: p.highlight ? "rgba(200,169,110,0.04)" : "#141210",
-                position: "relative",
-              }}>
-                {p.highlight && (
-                  <div style={{
-                    position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)",
-                    background: "#c8a96e", color: "#0c0b09", fontSize: 10, fontWeight: 800,
-                    padding: "4px 12px", borderRadius: 100, letterSpacing: "0.1em", textTransform: "uppercase",
-                    whiteSpace: "nowrap",
-                  }}>Most Popular</div>
-                )}
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(232,224,208,0.45)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>{p.name}</div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                    <span style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-0.04em", color: "#e8e0d0" }}>{p.price}</span>
-                    <span style={{ fontSize: 13, color: "rgba(232,224,208,0.4)" }}>{p.per}</span>
-                  </div>
-                  <p style={{ fontSize: 13, color: "rgba(232,224,208,0.5)", marginTop: 8, lineHeight: 1.55 }}>{p.desc}</p>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
-                  {p.features.map((f, j) => (
-                    <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "rgba(232,224,208,0.6)" }}>
-                      <span style={{ color: "#c8a96e" }}>✓</span> {f}
-                    </div>
-                  ))}
-                </div>
-                <a href="#preview-tool" className={p.highlight ? "btn-primary" : "btn-secondary"} style={{ width: "100%", justifyContent: "center", display: "flex" }}>
-                  {p.highlight ? "Get Started →" : "Learn More →"}
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="divider" />
-
-      {/* ── FAQ ──────────────────────────────────────────────────────────────── */}
-      <section id="faq" style={{ padding: "100px 24px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 56 }}>
-            <div className="section-label">FAQ</div>
-            <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em" }}>
-              Questions answered.
-            </h2>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {FAQ.map((f, i) => (
-              <div key={i} style={{ borderBottom: "1px solid #1e1c18" }}>
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  style={{
-                    width: "100%", textAlign: "left", padding: "20px 0", background: "none", border: "none", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
-                    color: "#e8e0d0", fontFamily: "inherit",
-                  }}
-                >
-                  <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em" }}>{f.q}</span>
-                  <span style={{ color: "#c8a96e", fontSize: 20, flexShrink: 0, transition: "transform 0.2s", transform: openFaq === i ? "rotate(45deg)" : "none" }}>+</span>
-                </button>
-                {openFaq === i && (
-                  <div style={{ paddingBottom: 20, fontSize: 14, color: "rgba(232,224,208,0.55)", lineHeight: 1.7 }}>
-                    {f.a}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="divider" />
-
-      {/* ── CLOSING CTA ──────────────────────────────────────────────────────── */}
-      <section id="contact" style={{ padding: "100px 24px", textAlign: "center", position: "relative" }}>
-        <div style={{
-          position: "absolute", inset: 0, pointerEvents: "none",
-          backgroundImage: "radial-gradient(ellipse at 50% 50%, rgba(200,169,110,0.06) 0%, transparent 65%)",
-        }} />
-        <div style={{ position: "relative", zIndex: 1, maxWidth: 600, margin: "0 auto" }}>
-          <div className="section-label" style={{ textAlign: "center" }}>Ready?</div>
-          <h2 style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", fontWeight: 900, letterSpacing: "-0.04em", marginBottom: 20 }}>
-            Stop losing customers<br />to a bad website.
-          </h2>
-          <p style={{ fontSize: 17, color: "rgba(232,224,208,0.5)", marginBottom: 40, lineHeight: 1.65 }}>
-            Paste your URL and see what your site could look like in 60 seconds. No commitment. No credit card.
-          </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <a href="#preview-tool" className="btn-primary" style={{ fontSize: 16, padding: "16px 32px" }}>See My Preview →</a>
-            <a href="mailto:hello@randybuilds.ca" className="btn-secondary" style={{ fontSize: 16, padding: "16px 32px" }}>Email Directly</a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FOOTER ───────────────────────────────────────────────────────────── */}
-      <footer style={{
-        padding: "32px 32px", background: "#0a0908",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        borderTop: "1px solid #1e1c18", flexWrap: "wrap", gap: 16,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.03em", color: "#e8e0d0" }}>
-            randy<span style={{ color: "#c8a96e" }}>builds</span>
-          </span>
-          <span style={{ fontSize: 12, color: "rgba(232,224,208,0.25)", marginLeft: 8 }}>Alberta web design from $800 CAD</span>
-        </div>
-        <div style={{ display: "flex", gap: 24 }}>
-          {["Work", "Process", "Pricing", "FAQ"].map(l => (
-            <a key={l} href={`#${l.toLowerCase()}`} style={{ fontSize: 13, color: "rgba(232,224,208,0.35)", textDecoration: "none", fontWeight: 500 }}>{l}</a>
+              <a href="mailto:hello@randybuilds.ca" className={`price-btn ${p.btn}`}>{p.label} ↗</a>
+            </div>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: "rgba(232,224,208,0.2)" }}>© 2026 RandyBuilds</div>
+      </section>
+
+      {/* ── CTA ─────────────────────────────────────────────────────────────── */}
+      <section className="cta-section" id="contact">
+        <div className="cta-glow" />
+        <p className="cta-eyebrow">Ready to look the part?</p>
+        <h2 className="cta-headline">
+          Drop your<br />URL. See the <em>difference.</em>
+        </h2>
+        <div className="cta-form-wrap">
+          <div className="url-form-wrap">
+            <form className="url-form" onSubmit={handleSubmit}>
+              <span className="url-icon">↗</span>
+              <input
+                className="url-input"
+                type="text"
+                placeholder="yourbusiness.com"
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                disabled={loading}
+              />
+              <button className="url-submit" type="submit" disabled={loading}>
+                {loading ? "Building..." : "Preview →"}
+              </button>
+            </form>
+            {error && <p className="url-error">{error}</p>}
+            {!error && <p className="url-hint">Free. No account needed. ~30 seconds.</p>}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        <span className="footer-name">RandyBuilds</span>
+        <span className="footer-center">Alberta Web Design · {new Date().getFullYear()}</span>
+        <span className="footer-right">hello@randybuilds.ca</span>
       </footer>
-    </div>
+    </>
   );
 }
