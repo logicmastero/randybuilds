@@ -92,7 +92,7 @@ Return the complete updated HTML and a brief message about what you changed.`;
     conversationMessages.push({ role: "user", content: userContent });
 
     const response = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5",
       max_tokens: 8000,
       system: SYSTEM_PROMPT,
       messages: conversationMessages,
