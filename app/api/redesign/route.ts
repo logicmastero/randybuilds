@@ -446,10 +446,10 @@ function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claud
     : `<h1 class="hero-wordmark">${data.businessName}</h1>`;
 
   // Services as horizontal scrolling tags
-  const svcTags = services.map(s => `<span class="svc-tag">${s.title}</span>`).join("");
+  const svcTags = services.map(s => `<span class="svc-tag">${s}</span>`).join("");
 
   // Work rows — each service gets a full-bleed row
-  const workRows = services.map((s, i) => {
+  const workRows = serviceItems.map((s, i) => {
     const rowImg = [img1, img2, img3, img4, img5][i] ?? null;
     return `
 <div class="work-row" data-index="${String(i+1).padStart(2,"0")}">
