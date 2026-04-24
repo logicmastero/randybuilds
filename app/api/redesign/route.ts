@@ -104,6 +104,10 @@ function detectVertical(data: ScrapedInput): VerticalProfile {
   if (/real estate|realt|mortgage|property|homes for sale|mls|listing/.test(text))
     return { label: "real estate", defaultCta: "Browse Listings", defaultCtaSecondary: "Talk to an Agent", systemPersona: "conversion copywriter for real estate agencies and property platforms" };
 
+  // ── Equipment rental / power / generators ────────────────────────────────
+  if (/generator|temp power|temporary power|power rental|equipment rental|light tower|fuel tank|transformer rental|power distribution/.test(text))
+    return { label: "equipment rental & temporary power", defaultCta: "Get a Quote", defaultCtaSecondary: "View Fleet", systemPersona: "conversion copywriter for heavy equipment rental and temporary power companies serving construction and industrial job sites" };
+
   // ── Local trades ──────────────────────────────────────────────────────────
   if (/plumb|pipe|drain|sewer|water heater/.test(text))
     return { label: "plumbing contractor", defaultCta: "Book a Free Estimate", defaultCtaSecondary: "Call Us Now", systemPersona: "conversion copywriter for local home service contractors" };
@@ -195,7 +199,8 @@ Has phone number: ${data.phone ? "Yes" : "No"}
 
 CRITICAL RULES:
 1. The headline must NOT contain the business name. Write a benefit-driven outcome statement appropriate for ${vertical.label}.
-2. The subhead is ONE specific sentence (max 18 words) that speaks to the TARGET USER of a ${vertical.label} — not generic.
+2. HEADLINE LANGUAGE: For equipment rental/generator/power verticals, use field/job site language ONLY. Examples: "Power for every job site." "Ready when your job starts." "Temporary power, done right." NEVER use photography, sports, or camera metaphors (shot, capture, aim, lens, focus).
+3. The subhead is ONE specific sentence (max 18 words) that speaks to the TARGET USER of a ${vertical.label} — not generic.
 3. Every service/feature title must be rewritten to be punchy and outcome-focused for ${vertical.label}.
 4. Each service description must be UNIQUE and SPECIFIC to that particular service — do NOT repeat the same line.
 5. The CTA must be appropriate for ${vertical.label}. Suggested: "${vertical.defaultCta}" — but improve it if you can.
@@ -435,6 +440,15 @@ function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claud
       + `<span id="logo-text" class="logo-text" style="display:none">${data.businessName}</span>`
     : `<span class="logo-text">${data.businessName}</span>`;
 
+  // ── Premium hero logo + background image ─────────────────────────────────
+  const heroLogoHTML = data.logoUrl
+    ? `<div class="hero-logo-wrap"><img src="${data.logoUrl}" alt="${data.businessName}" class="hero-logo" onerror="this.closest('.hero-logo-wrap').innerHTML='<span class=\"hero-logo-text\">${data.businessName}</span>'"></div>`
+    : `<div class="hero-logo-wrap"><span class="hero-logo-text">${data.businessName}</span></div>`;
+
+  const heroBgImg = images.length > 0 ? images[0] : null;
+  const serviceImages = images.slice(1, 4);
+  const extraImages = images.slice(4, 10);
+
   // ── Services grid ──────────────────────────────────────────────────────────
   const SERVICE_ICONS = ["◆","◈","◉","▲","✦","⬡"];
   const servicesHTML = copy.services.map((s, i) => `
@@ -498,6 +512,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:cen
 nav.scrolled{box-shadow:0 4px 32px ${shadowColor}}
 .logo-wrap{display:flex;align-items:center;gap:10px;text-decoration:none}
 .logo-img{height:34px;width:auto;object-fit:contain;display:block}
+.hero-logo-wrap{display:flex;align-items:center;justify-content:center;margin-bottom:36px;animation:logo-in .6s cubic-bezier(.16,1,.3,1) both}
+@keyframes logo-in{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
+.hero-logo{height:90px;width:auto;max-width:340px;object-fit:contain;filter:drop-shadow(0 0 32px ${primary}66) drop-shadow(0 4px 20px rgba(0,0,0,.6));transition:filter .3s}
+.hero-logo:hover{filter:drop-shadow(0 0 56px ${primary}99) drop-shadow(0 4px 28px rgba(0,0,0,.7))}
+.hero-logo-text{font-size:2.8rem;font-weight:900;letter-spacing:-.04em;color:${primary};text-shadow:0 0 40px ${primary}88}
+.hero-bg-photo{position:absolute;inset:0;z-index:0;background-image:url(${heroBgImg || ""});background-size:cover;background-position:center;opacity:.18}
+.hero-bg-vignette{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,${bg} 0%,rgba(0,0,0,0) 25%,rgba(0,0,0,0) 75%,${bg} 100%)}
 .logo-text{font-weight:900;font-size:1.25rem;letter-spacing:-.03em;color:${textMain};white-space:nowrap}
 .nav-links{display:flex;align-items:center;gap:32px}
 .nav-links a{font-size:.875rem;font-weight:500;color:${textMid};text-decoration:none;transition:color .15s}
@@ -602,16 +623,22 @@ footer{padding:32px 48px;background:${bgMuted};border-top:1px solid ${border};di
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media(max-width:1024px){.about-inner{grid-template-columns:1fr;gap:48px}}
-.gallery-section{padding:120px 48px;max-width:1400px;margin:0 auto}
-.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
-.gallery-item{border-radius:16px;overflow:hidden;aspect-ratio:4/3;background:${bgCard};border:1px solid ${border};transition:transform .2s,box-shadow .2s;cursor:pointer}
-.gallery-item:hover{transform:scale(1.02);box-shadow:0 16px 48px ${shadowColor}}
-.gallery-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s cubic-bezier(.16,1,.3,1)}
-.gallery-item:hover img{transform:scale(1.06)}
-.gallery-item:nth-child(1){grid-column:span 2;aspect-ratio:16/9}
-.gallery-item:nth-child(5){grid-column:span 2;aspect-ratio:16/9}
-@media(max-width:768px){.gallery-grid{grid-template-columns:repeat(2,1fr)}.gallery-item:nth-child(1),.gallery-item:nth-child(5){grid-column:span 2}}
-@media(max-width:480px){.gallery-grid{grid-template-columns:1fr}.gallery-item:nth-child(1),.gallery-item:nth-child(5){grid-column:span 1;aspect-ratio:4/3}}
+.feature-strip{overflow:hidden;border-top:1px solid ${border};border-bottom:1px solid ${border}}
+.feature-strip-inner{display:flex;height:300px}
+.feature-img-cell{flex:1;overflow:hidden;position:relative}
+.feature-img-cell img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s cubic-bezier(.16,1,.3,1)}
+.feature-img-cell:hover img{transform:scale(1.06)}
+.feature-img-cell+.feature-img-cell{border-left:1px solid ${border}}
+.work-section{padding:100px 48px;max-width:1360px;margin:0 auto}
+.work-inner{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.work-mosaic{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:190px 190px;gap:12px}
+.work-mosaic [class^="mosaic-"]{border-radius:14px;overflow:hidden;background:${bgCard};border:1px solid ${border};transition:transform .2s,box-shadow .2s}
+.work-mosaic [class^="mosaic-"]:hover{transform:translateY(-4px);box-shadow:0 20px 48px ${shadowColor}}
+.work-mosaic [class^="mosaic-"] img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s cubic-bezier(.16,1,.3,1)}
+.work-mosaic [class^="mosaic-"]:hover img{transform:scale(1.07)}
+.mosaic-0{grid-row:span 2}
+@media(max-width:900px){.work-inner{grid-template-columns:1fr}.work-mosaic{grid-template-rows:160px;grid-template-columns:repeat(3,1fr)}.mosaic-0{grid-row:span 1}}
+@media(max-width:600px){.feature-strip-inner{height:200px}.feature-img-cell:nth-child(3){display:none}.work-mosaic{grid-template-columns:repeat(2,1fr)}.work-mosaic [class^="mosaic-"]:nth-child(4){display:none}}
 
 @media(max-width:768px){
   nav{padding:0 20px}
@@ -645,10 +672,12 @@ ${aiBadge}
 <!-- Hero -->
 <section class="hero">
   <div class="hero-bg"></div>
+  ${heroBgImg ? '<div class="hero-bg-photo"></div><div class="hero-bg-vignette"></div>' : ''}
   <div class="hero-grid"></div>
   <div class="orb orb-1"></div>
   <div class="orb orb-2"></div>
   <div class="orb orb-3"></div>
+  ${heroLogoHTML}
   <div class="hero-eyebrow">✦ Premium Redesign Preview by RandyBuilds</div>
   <h1 class="hero-headline"><span class="grad">${copy.headline}</span></h1>
   <p class="hero-sub">${copy.subhead}</p>
@@ -675,18 +704,34 @@ ${aiBadge}
 </section>
 
 <!-- Image Gallery -->
-${images.length > 0 ? `
-<section class="gallery-section" id="gallery">
-  <div class="reveal">
-    <div class="section-label">Our Equipment & Work</div>
-    <h2 class="section-title">See what we <span style="color:${primary}">deliver</span></h2>
-  </div>
-  <div class="gallery-grid reveal">
-    ${images.slice(0, 9).map((img: string, i: number) => `
-      <div class="gallery-item" style="--i:${i}">
-        <img src="${img}" alt="${data.businessName} equipment photo ${i+1}" loading="lazy" onerror="this.closest('.gallery-item').style.display='none'">
+${serviceImages.length > 0 ? `
+<section class="feature-strip">
+  <div class="feature-strip-inner">
+    ${serviceImages.map((img: string) => `
+      <div class="feature-img-cell">
+        <img src="${img}" alt="${data.businessName}" loading="lazy" onerror="this.closest('.feature-img-cell').style.display='none'">
       </div>
     `).join("")}
+  </div>
+</section>
+` : ""}
+
+${extraImages.length > 0 ? `
+<section class="work-section reveal">
+  <div class="work-inner">
+    <div class="work-text">
+      <div class="section-label">On The Job</div>
+      <h2 class="section-title">Fleet-ready for <span style="color:${primary}">your site</span></h2>
+      <p class="section-sub">Every unit is maintained, load-tested, and ready to deploy. We keep your job site running.</p>
+      <a href="#contact" class="btn-primary" style="margin-top:28px;display:inline-flex">${copy.cta} <span class="btn-arrow">→</span></a>
+    </div>
+    <div class="work-mosaic">
+      ${extraImages.slice(0,4).map((img: string, i: number) => `
+        <div class="mosaic-${i}">
+          <img src="${img}" alt="${data.businessName} equipment" loading="lazy" onerror="this.closest('[class^=mosaic]').style.display='none'">
+        </div>
+      `).join("")}
+    </div>
   </div>
 </section>
 ` : ""}
