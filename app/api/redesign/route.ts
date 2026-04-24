@@ -410,403 +410,388 @@ function buildFallbackCopy(data: ScrapedInput, vertical?: VerticalProfile): Rede
 // ─── Preview HTML builder ─────────────────────────────────────────────────────
 
 function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claude" | "fallback"): string {
-  // ── Color system ────────────────────────────────────────────────────────────
+  // ── Normalize images ────────────────────────────────────────────────────────
   const images = (data as ScrapedInput & { images?: string[] }).images ?? [];
-  const primary   = data.colors[0] || "#2563eb";
-  const secondary = data.colors[1] || primary;
-
-  // Determine if primary is light or dark to set theme
-  const hex = primary.replace("#","");
-  const rr = parseInt(hex.slice(0,2),16), gg = parseInt(hex.slice(2,4),16), bb2 = parseInt(hex.slice(4,6),16);
-  const luminance = (0.299*rr + 0.587*gg + 0.114*bb2)/255;
-  const isDark = luminance < 0.45;
-
-  const bg       = isDark ? "#fafafa" : "#0a0a0a";
-  const bgCard   = isDark ? "#ffffff" : "#111111";
-  const bgMuted  = isDark ? "#f4f4f5" : "#161616";
-  const border   = isDark ? "#e4e4e7" : "#1f1f1f";
-  const textMain = isDark ? "#09090b" : "#f4f4f5";
-  const textMid  = isDark ? "#52525b" : "#a1a1aa";
-  const textDim  = isDark ? "#71717a" : "#71717a";
-  const navBg    = isDark ? "rgba(250,250,250,0.95)" : "rgba(10,10,10,0.97)";
-  const navBdr   = isDark ? "#e4e4e7" : "#1f1f1f";
-  const shadowColor = isDark ? `rgba(${rr},${gg},${bb2},.15)` : `rgba(${rr},${gg},${bb2},.25)`;
-  const orbColor1 = `rgba(${rr},${gg},${bb2},${isDark ? "0.12" : "0.18"})`;
-  const orbColor2 = `rgba(${parseInt(secondary.replace("#","").slice(0,2),16)},${parseInt(secondary.replace("#","").slice(2,4),16)},${parseInt(secondary.replace("#","").slice(4,6),16)},${isDark ? "0.08" : "0.14"})`;
-
-  // ── Logo rendering ─────────────────────────────────────────────────────────
-  const logoHTML = data.logoUrl
-    ? `<img src="${data.logoUrl}" alt="${data.businessName} logo" class="logo-img" onerror="this.style.display='none';document.getElementById('logo-text').style.display='block'">`
-      + `<span id="logo-text" class="logo-text" style="display:none">${data.businessName}</span>`
-    : `<span class="logo-text">${data.businessName}</span>`;
-
-  // ── Premium hero logo + background image ─────────────────────────────────
-  const heroLogoHTML = data.logoUrl
-    ? `<div class="hero-logo-wrap"><img src="${data.logoUrl}" alt="${data.businessName}" class="hero-logo" onerror="this.closest('.hero-logo-wrap').innerHTML='<span class=\"hero-logo-text\">${data.businessName}</span>'"></div>`
-    : `<div class="hero-logo-wrap"><span class="hero-logo-text">${data.businessName}</span></div>`;
-
-  const heroBgImg = images.length > 0 ? images[0] : null;
+  const heroBgImg   = images[0] ?? null;
   const serviceImages = images.slice(1, 4);
-  const extraImages = images.slice(4, 10);
+  const extraImages   = images.slice(4, 10);
 
-  // ── Services grid ──────────────────────────────────────────────────────────
-  const SERVICE_ICONS = ["◆","◈","◉","▲","✦","⬡"];
+  // ── Color system ────────────────────────────────────────────────────────────
+  const rawPrimary = data.colors[0] || "#1a1a1a";
+  const rawSecondary = data.colors[1] || rawPrimary;
+
+  // Parse primary
+  const hp = rawPrimary.replace("#","");
+  const pr = parseInt(hp.slice(0,2),16), pg = parseInt(hp.slice(2,4),16), pb = parseInt(hp.slice(4,6),16);
+  const lum = (0.299*pr + 0.587*pg + 0.114*pb)/255;
+
+  // Always render on a near-black canvas for maximum premium feel
+  // Use brand color only as accent, never as background
+  const accent  = rawPrimary;
+  const accent2 = rawSecondary;
+
+  const bg      = "#0c0c0e";
+  const bgCard  = "#131316";
+  const bgMuted = "#18181c";
+  const border  = "#242428";
+  const borderAccent = `rgba(${pr},${pg},${pb},0.25)`;
+  const textMain = "#f0f0f2";
+  const textMid  = "#8c8c96";
+  const textDim  = "#52525a";
+  const shadowAccent = `rgba(${pr},${pg},${pb},0.20)`;
+  const glowAccent   = `rgba(${pr},${pg},${pb},0.12)`;
+
+  // Secondary color parsing
+  const hs = rawSecondary.replace("#","");
+  const sr = parseInt(hs.slice(0,2),16), sg = parseInt(hs.slice(2,4),16), sb = parseInt(hs.slice(4,6),16);
+
+  // ── Logo ────────────────────────────────────────────────────────────────────
+  const navLogoHTML = data.logoUrl
+    ? `<img src="${data.logoUrl}" alt="${data.businessName}" class="nav-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="nav-logo-text" style="display:none">${data.businessName}</span>`
+    : `<span class="nav-logo-text">${data.businessName}</span>`;
+
+  const heroLogoHTML = data.logoUrl
+    ? `<img src="${data.logoUrl}" alt="${data.businessName}" class="hero-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="hero-logo-wordmark" style="display:none">${data.businessName}</div>`
+    : `<div class="hero-logo-wordmark">${data.businessName}</div>`;
+
+  // ── Services ────────────────────────────────────────────────────────────────
   const servicesHTML = copy.services.map((s, i) => `
-    <div class="card" style="--i:${i}">
-      <div class="card-icon-wrap">
-        <span class="card-icon">${SERVICE_ICONS[i % SERVICE_ICONS.length]}</span>
+    <div class="svc-card" style="--delay:${i * 60}ms">
+      <div class="svc-num">0${i+1}</div>
+      <div class="svc-content">
+        <h3 class="svc-title">${s.title}</h3>
+        <p class="svc-desc">${s.desc}</p>
       </div>
-      <div class="card-body">
-        <h3 class="card-title">${s.title}</h3>
-        <p class="card-desc">${s.desc}</p>
-      </div>
+      <div class="svc-arrow">↗</div>
     </div>`).join("");
 
-  // ── Stats strip (trust signals) ────────────────────────────────────────────
+  // ── Contact ──────────────────────────────────────────────────────────────────
   const domain = (() => { try { return new URL(data.url).hostname.replace("www.",""); } catch { return data.url; } })();
+  const phoneHref = data.phone ? `tel:${data.phone.replace(/\D/g,"")}` : "#contact";
+  const emailHref = data.email ? `mailto:${data.email}` : "#contact";
 
-  // ── Phone / contact pill ───────────────────────────────────────────────────
-  const contactPill = data.phone
-    ? `<a href="tel:${data.phone.replace(/\D/g,"")}" class="contact-pill">📞 ${data.phone}</a>`
-    : data.email
-      ? `<a href="mailto:${data.email}" class="contact-pill">✉ ${data.email}</a>`
-      : "";
+  // ── Feature strip (3 images, full width, cinematic) ──────────────────────
+  const featureStripHTML = serviceImages.length > 0
+    ? `<section class="img-strip">
+        ${serviceImages.map(img => `<div class="strip-cell"><img src="${img}" alt="${data.businessName}" loading="lazy" onerror="this.closest('.strip-cell').style.display='none'"></div>`).join("")}
+      </section>`
+    : "";
 
+  // ── Mosaic work section ───────────────────────────────────────────────────
+  const mosaicHTML = extraImages.length >= 2
+    ? `<section class="mosaic-section">
+        <div class="mosaic-inner">
+          <div class="mosaic-copy">
+            <p class="overline">Our Work</p>
+            <h2 class="mosaic-headline">Built for the <em>field</em></h2>
+            <p class="mosaic-body">${data.description ? data.description.slice(0,160).replace(/[.!?].*$/s, "") + "." : `${data.businessName} shows up ready — every unit maintained, every job covered.`}</p>
+            <a href="#contact" class="cta-pill">${copy.cta} <span>→</span></a>
+          </div>
+          <div class="mosaic-grid">
+            ${extraImages.slice(0,4).map((img, i) => `
+              <div class="mosaic-cell mc-${i}">
+                <img src="${img}" alt="" loading="lazy" onerror="this.closest('.mosaic-cell').style.display='none'">
+              </div>`).join("")}
+          </div>
+        </div>
+      </section>`
+    : "";
+
+  // ── AI badge ──────────────────────────────────────────────────────────────
   const aiBadge = source === "claude"
-    ? `<div class="ai-badge">⚡ AI Copy <span class="claude-credit">Powered by Claude AI</span></div>`
-    : `<div class="ai-badge fallback-badge">📝 Template Preview</div>`;
-
-  // ── Stat numbers (vertical-aware) ─────────────────────────────────────────
-  const isLocal = /contractor|trades|plumb|electr|roof|hvac|landscap|clean|auto|restaurant|dental|salon|weld|mechanic|tow/.test(
-    [data.description, ...data.services].join(" ").toLowerCase()
-  );
-  const stats = isLocal
-    ? [["5-Star","Reviews"],["Licensed","& Insured"],["Fast","Response"],["Free","Estimates"]]
-    : [["99.9%","Uptime SLA"],["<50ms","Response Time"],["256-bit","Encryption"],["24/7","Support"]];
-
-  const statsHTML = stats.map(([num,label]) => `
-    <div class="stat-item">
-      <div class="stat-num">${num}</div>
-      <div class="stat-label">${label}</div>
-    </div>`).join(`<div class="stat-div"></div>`);
+    ? `<div class="ai-pill">⚡ AI-Generated Copy</div>`
+    : `<div class="ai-pill ai-fallback">📋 Template Preview</div>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>${data.businessName} — Premium Redesign by RandyBuilds</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<title>${data.businessName} — Redesign by RandyBuilds</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <style>
-/* ── Reset & base ─────────────────────────────────────────────────────── */
+/* ─── Reset ──────────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:'Inter',system-ui,sans-serif;background:${bg};color:${textMain};overflow-x:hidden;-webkit-font-smoothing:antialiased}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:'DM Sans',system-ui,sans-serif;background:${bg};color:${textMain};overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+img{max-width:100%;display:block}
+a{text-decoration:none;color:inherit}
 
-/* ── Scroll-reveal ────────────────────────────────────────────────────── */
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
-.reveal.visible{opacity:1;transform:none}
+/* ─── Reveal ─────────────────────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .75s cubic-bezier(.16,1,.3,1),transform .75s cubic-bezier(.16,1,.3,1)}
+.reveal.in{opacity:1;transform:none}
+.reveal-left{opacity:0;transform:translateX(-32px);transition:opacity .75s cubic-bezier(.16,1,.3,1),transform .75s cubic-bezier(.16,1,.3,1)}
+.reveal-left.in{opacity:1;transform:none}
+.reveal-right{opacity:0;transform:translateX(32px);transition:opacity .75s cubic-bezier(.16,1,.3,1),transform .75s cubic-bezier(.16,1,.3,1)}
+.reveal-right.in{opacity:1;transform:none}
 
-/* ── Navigation ───────────────────────────────────────────────────────── */
-nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:68px;background:${navBg};backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid ${navBdr};transition:box-shadow .2s}
-nav.scrolled{box-shadow:0 4px 32px ${shadowColor}}
-.logo-wrap{display:flex;align-items:center;gap:10px;text-decoration:none}
-.logo-img{height:34px;width:auto;object-fit:contain;display:block}
-.hero-logo-wrap{display:flex;align-items:center;justify-content:center;margin-bottom:36px;animation:logo-in .6s cubic-bezier(.16,1,.3,1) both}
-@keyframes logo-in{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
-.hero-logo{height:90px;width:auto;max-width:340px;object-fit:contain;filter:drop-shadow(0 0 32px ${primary}66) drop-shadow(0 4px 20px rgba(0,0,0,.6));transition:filter .3s}
-.hero-logo:hover{filter:drop-shadow(0 0 56px ${primary}99) drop-shadow(0 4px 28px rgba(0,0,0,.7))}
-.hero-logo-text{font-size:2.8rem;font-weight:900;letter-spacing:-.04em;color:${primary};text-shadow:0 0 40px ${primary}88}
-.hero-bg-photo{position:absolute;inset:0;z-index:0;background-image:url(${heroBgImg || ""});background-size:cover;background-position:center;opacity:.18}
-.hero-bg-vignette{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,${bg} 0%,rgba(0,0,0,0) 25%,rgba(0,0,0,0) 75%,${bg} 100%)}
-.logo-text{font-weight:900;font-size:1.25rem;letter-spacing:-.03em;color:${textMain};white-space:nowrap}
-.nav-links{display:flex;align-items:center;gap:32px}
-.nav-links a{font-size:.875rem;font-weight:500;color:${textMid};text-decoration:none;transition:color .15s}
-.nav-links a:hover{color:${primary}}
-.nav-cta{padding:10px 24px;border-radius:10px;font-weight:700;font-size:.875rem;text-decoration:none;color:#fff !important;background:${primary};transition:opacity .15s,transform .15s;white-space:nowrap}
+/* ─── NAV ─────────────────────────────────────────────────────────── */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 56px;transition:background .3s,border-color .3s,backdrop-filter .3s}
+.nav.solid{background:rgba(12,12,14,0.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid ${border}}
+.nav-logo{height:36px;width:auto;object-fit:contain}
+.nav-logo-text{font-size:1.2rem;font-weight:700;letter-spacing:-.02em;color:${textMain}}
+.nav-links{display:flex;gap:36px}
+.nav-links a{font-size:.875rem;font-weight:500;color:${textMid};transition:color .15s}
+.nav-links a:hover{color:${textMain}}
+.nav-cta{padding:10px 22px;background:${accent};color:#fff;border-radius:8px;font-size:.875rem;font-weight:600;transition:opacity .15s,transform .15s}
 .nav-cta:hover{opacity:.88;transform:translateY(-1px)}
+@media(max-width:768px){.nav{padding:0 24px}.nav-links{display:none}}
 
-/* ── Hero ─────────────────────────────────────────────────────────────── */
-.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:140px 24px 100px;position:relative;overflow:hidden}
-.hero-bg{position:absolute;inset:0;z-index:0;background:${bg}}
-.orb{position:absolute;border-radius:50%;filter:blur(100px);pointer-events:none}
-.orb-1{width:800px;height:800px;top:-320px;left:-200px;background:radial-gradient(circle,${orbColor1} 0%,transparent 65%);animation:drift1 18s ease-in-out infinite alternate}
-.orb-2{width:600px;height:600px;bottom:-200px;right:-150px;background:radial-gradient(circle,${orbColor2} 0%,transparent 65%);animation:drift2 24s ease-in-out infinite alternate}
-.orb-3{width:400px;height:400px;top:50%;left:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,${orbColor1} 0%,transparent 60%);opacity:.35;animation:drift3 30s ease-in-out infinite alternate}
-@keyframes drift1{0%{transform:translate(0,0)}100%{transform:translate(80px,60px)}}
-@keyframes drift2{0%{transform:translate(0,0)}100%{transform:translate(-60px,-40px)}}
-@keyframes drift3{0%{transform:translate(-50%,-50%) scale(1)}100%{transform:translate(-50%,-50%) scale(1.3)}}
-.hero-grid{position:absolute;inset:0;background-image:linear-gradient(${border}40 1px,transparent 1px),linear-gradient(90deg,${border}40 1px,transparent 1px);background-size:64px 64px;z-index:0;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 0%,transparent 100%)}
-.hero>*:not(.hero-bg):not(.orb):not(.hero-grid){position:relative;z-index:1}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:999px;font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:32px;background:${isDark ? `rgba(${rr},${gg},${bb2},.08)` : `rgba(${rr},${gg},${bb2},.12)`};border:1px solid ${isDark ? `rgba(${rr},${gg},${bb2},.2)` : `rgba(${rr},${gg},${bb2},.3)`};color:${primary};animation:eyebrow-in .5s cubic-bezier(.16,1,.3,1) both}
-@keyframes eyebrow-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
-h1.hero-headline{font-family:'Playfair Display',Georgia,serif;font-size:clamp(3rem,8vw,7rem);font-weight:900;line-height:1.0;letter-spacing:-.04em;margin-bottom:28px;animation:headline-in .7s cubic-bezier(.16,1,.3,1) both .1s}
-@keyframes headline-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
-.hero-headline .grad{background:linear-gradient(135deg,${primary} 0%,${secondary} 60%,${primary} 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 4s linear infinite}
-@keyframes shimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
-.hero-sub{font-size:clamp(1.05rem,2.2vw,1.35rem);color:${textMid};max-width:640px;line-height:1.7;margin-bottom:48px;animation:sub-in .7s cubic-bezier(.16,1,.3,1) both .2s}
-@keyframes sub-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-.cta-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;animation:cta-in .7s cubic-bezier(.16,1,.3,1) both .3s}
-@keyframes cta-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:17px 38px;border-radius:12px;font-weight:800;font-size:1rem;text-decoration:none;color:#fff;background:${primary};box-shadow:0 0 0 0 ${primary}44;transition:transform .15s,box-shadow .2s,opacity .15s;position:relative;overflow:hidden}
-.btn-primary::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none}
-.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px ${isDark ? `rgba(${rr},${gg},${bb2},.3)` : `rgba(${rr},${gg},${bb2},.4)`};opacity:.95}
-.btn-primary:active{transform:translateY(0)}
-.btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:17px 38px;border-radius:12px;font-weight:700;font-size:1rem;text-decoration:none;color:${textMain};border:1.5px solid ${border};background:transparent;transition:border-color .15s,background .15s,transform .15s}
-.btn-secondary:hover{border-color:${primary};background:${isDark ? `rgba(${rr},${gg},${bb2},.04)` : `rgba(${rr},${gg},${bb2},.08)`};transform:translateY(-2px)}
-.btn-arrow{font-size:1.1rem;transition:transform .15s}
-.btn-primary:hover .btn-arrow,.btn-secondary:hover .btn-arrow{transform:translateX(4px)}
-${contactPill ? `.contact-pill{display:inline-flex;align-items:center;gap:8px;margin-top:24px;padding:10px 22px;border-radius:999px;font-size:.9rem;font-weight:600;color:${primary};text-decoration:none;border:1.5px solid ${isDark ? `rgba(${rr},${gg},${bb2},.25)` : `rgba(${rr},${gg},${bb2},.35)`};background:${isDark ? `rgba(${rr},${gg},${bb2},.06)` : `rgba(${rr},${gg},${bb2},.1)`};transition:background .15s,transform .15s}
-.contact-pill:hover{background:${isDark ? `rgba(${rr},${gg},${bb2},.12)` : `rgba(${rr},${gg},${bb2},.18)`};transform:translateY(-1px)}` : ""}
+/* ─── HERO ────────────────────────────────────────────────────────── */
+.hero{min-height:100svh;display:grid;place-items:center;position:relative;overflow:hidden;padding:120px 56px 100px}
+.hero-bg{position:absolute;inset:0;background:${bg}}
+${heroBgImg ? `
+.hero-photo{position:absolute;inset:0;background:url(${heroBgImg}) center/cover no-repeat;opacity:.15}
+.hero-photo-grad{position:absolute;inset:0;background:radial-gradient(ellipse 120% 100% at 50% 100%,${bg} 0%,transparent 60%),linear-gradient(180deg,${bg} 0%,transparent 20%,transparent 80%,${bg} 100%)}
+` : ""}
+.hero-noise{position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");opacity:.4;pointer-events:none}
+.hero-glow{position:absolute;width:900px;height:900px;top:50%;left:50%;transform:translate(-50%,-60%);background:radial-gradient(circle,${glowAccent} 0%,transparent 65%);pointer-events:none}
+.hero-content{position:relative;z-index:2;text-align:center;max-width:860px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:0}
+.hero-logo{height:72px;width:auto;max-width:280px;object-fit:contain;margin-bottom:40px;filter:drop-shadow(0 0 24px ${accent}55);animation:fadeUp .7s cubic-bezier(.16,1,.3,1) both}
+.hero-logo-wordmark{font-family:'DM Serif Display',Georgia,serif;font-size:2rem;font-weight:400;color:${accent};margin-bottom:40px;letter-spacing:-.02em;animation:fadeUp .7s cubic-bezier(.16,1,.3,1) both}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:${accent};margin-bottom:28px;animation:fadeUp .7s cubic-bezier(.16,1,.3,1) .05s both}
+.hero-eyebrow::before,.hero-eyebrow::after{content:'';display:block;height:1px;width:28px;background:${accent};opacity:.5}
+.hero-headline{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(3.2rem,7.5vw,7.2rem);font-weight:400;font-style:italic;line-height:1.0;letter-spacing:-.03em;color:${textMain};margin-bottom:28px;animation:fadeUp .8s cubic-bezier(.16,1,.3,1) .1s both}
+.hero-headline em{font-style:normal;color:${accent}}
+.hero-sub{font-size:clamp(1rem,2vw,1.2rem);font-weight:300;color:${textMid};line-height:1.8;max-width:560px;margin-bottom:52px;animation:fadeUp .8s cubic-bezier(.16,1,.3,1) .18s both}
+.hero-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;animation:fadeUp .8s cubic-bezier(.16,1,.3,1) .26s both}
+.btn-fill{display:inline-flex;align-items:center;gap:10px;padding:15px 34px;background:${accent};color:#fff;border-radius:100px;font-size:.95rem;font-weight:600;letter-spacing:-.01em;transition:transform .18s,box-shadow .18s,opacity .15s;box-shadow:0 8px 32px ${shadowAccent}}
+.btn-fill:hover{transform:translateY(-2px);box-shadow:0 16px 48px ${shadowAccent};opacity:.93}
+.btn-outline{display:inline-flex;align-items:center;gap:10px;padding:15px 34px;border:1.5px solid ${border};color:${textMid};border-radius:100px;font-size:.95rem;font-weight:500;letter-spacing:-.01em;transition:border-color .15s,color .15s,transform .15s}
+.btn-outline:hover{border-color:${accent}88;color:${textMain};transform:translateY(-2px)}
+${data.phone ? `.hero-phone{margin-top:28px;font-size:.875rem;color:${textDim};animation:fadeUp .8s cubic-bezier(.16,1,.3,1) .34s both}.hero-phone a{color:${accent};font-weight:600;transition:opacity .15s}.hero-phone a:hover{opacity:.75}` : ""}
+.hero-scroll{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;opacity:.35;animation:bob 2s ease-in-out infinite}
+.hero-scroll span{font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:${textMid}}
+.hero-scroll-line{width:1px;height:36px;background:linear-gradient(${textDim},transparent)}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(5px)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 
-/* ── Trust bar ────────────────────────────────────────────────────────── */
-.trust{padding:40px 24px;border-top:1px solid ${border};border-bottom:1px solid ${border};background:${bgMuted}}
-.trust-inner{max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap}
-.stat-item{text-align:center;padding:16px 36px;flex:1;min-width:120px}
-.stat-num{font-size:1.5rem;font-weight:900;letter-spacing:-.03em;color:${primary};line-height:1}
-.stat-label{font-size:.78rem;font-weight:600;color:${textMid};letter-spacing:.06em;text-transform:uppercase;margin-top:6px}
-.stat-div{width:1px;height:40px;background:${border};flex-shrink:0}
+/* ─── MARQUEE / TICKER ───────────────────────────────────────────── */
+.ticker{border-top:1px solid ${border};border-bottom:1px solid ${border};overflow:hidden;padding:20px 0;background:${bgMuted}}
+.ticker-track{display:flex;gap:0;animation:ticker 25s linear infinite;width:max-content}
+.ticker-item{display:flex;align-items:center;gap:12px;padding:0 48px;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${textDim};white-space:nowrap}
+.ticker-item::after{content:'✦';color:${accent};opacity:.6;margin-left:12px}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
-/* ── Services ─────────────────────────────────────────────────────────── */
-.services-section{padding:100px 24px;max-width:1160px;margin:0 auto}
-.section-label{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${primary};margin-bottom:16px}
-.section-title{font-family:'Playfair Display',Georgia,serif;font-size:clamp(2rem,5vw,3.6rem);font-weight:900;letter-spacing:-.03em;line-height:1.1;margin-bottom:16px;color:${textMain}}
-.section-sub{font-size:1.05rem;color:${textMid};max-width:560px;line-height:1.7;margin-bottom:64px}
-.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
-.card{background:${bgCard};border:1px solid ${border};border-radius:20px;padding:32px;display:flex;align-items:flex-start;gap:20px;transition:border-color .2s,transform .2s,box-shadow .2s;opacity:0;transform:translateY(20px);transition:opacity .5s cubic-bezier(.16,1,.3,1) calc(var(--i)*80ms), transform .5s cubic-bezier(.16,1,.3,1) calc(var(--i)*80ms), border-color .2s, box-shadow .2s}
-.card.visible{opacity:1;transform:translateY(0)}
-.card:hover{border-color:${primary}44;transform:translateY(-4px);box-shadow:0 20px 60px ${shadowColor}}
-.card-icon-wrap{width:48px;height:48px;border-radius:14px;background:${isDark ? `rgba(${rr},${gg},${bb2},.1)` : `rgba(${rr},${gg},${bb2},.15)`};display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.card-icon{font-size:1.3rem;color:${primary}}
-.card-body{}
-.card-title{font-size:1.05rem;font-weight:700;color:${textMain};margin-bottom:10px;line-height:1.3}
-.card-desc{font-size:.9rem;color:${textMid};line-height:1.65}
+/* ─── SERVICES ───────────────────────────────────────────────────── */
+.services{padding:130px 56px;max-width:1200px;margin:0 auto}
+.section-header{margin-bottom:72px}
+.overline{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${accent};margin-bottom:16px;display:block}
+.section-h{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(2.2rem,4.5vw,3.8rem);font-weight:400;letter-spacing:-.025em;line-height:1.1;color:${textMain}}
+.section-h em{font-style:italic;color:${textMid}}
+.svc-list{display:flex;flex-direction:column;gap:0;border-top:1px solid ${border}}
+.svc-card{display:grid;grid-template-columns:80px 1fr 40px;align-items:center;gap:32px;padding:32px 0;border-bottom:1px solid ${border};cursor:default;transition:background .2s;opacity:0;transform:translateY(16px);transition:opacity .55s cubic-bezier(.16,1,.3,1) var(--delay),transform .55s cubic-bezier(.16,1,.3,1) var(--delay),background .2s}
+.svc-card.in{opacity:1;transform:none}
+.svc-card:hover{background:${bgCard};border-radius:12px;padding-left:20px;padding-right:20px;margin:0 -20px}
+.svc-num{font-size:.75rem;font-weight:700;color:${textDim};letter-spacing:.1em}
+.svc-content{}
+.svc-title{font-size:1.1rem;font-weight:600;color:${textMain};margin-bottom:6px;letter-spacing:-.01em}
+.svc-desc{font-size:.9rem;color:${textMid};line-height:1.65;font-weight:300}
+.svc-arrow{font-size:1.1rem;color:${textDim};transition:color .15s,transform .15s;justify-self:end}
+.svc-card:hover .svc-arrow{color:${accent};transform:translate(3px,-3px)}
+@media(max-width:640px){.svc-card{grid-template-columns:48px 1fr}.svc-arrow{display:none}.services{padding:80px 24px}}
 
-/* ── About strip ──────────────────────────────────────────────────────── */
-.about{padding:80px 24px;background:${bgMuted};border-top:1px solid ${border};border-bottom:1px solid ${border}}
-.about-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
-.about-text .section-label{margin-bottom:12px}
-.about-headline{font-family:'Playfair Display',Georgia,serif;font-size:clamp(1.8rem,4vw,2.8rem);font-weight:900;letter-spacing:-.03em;line-height:1.15;margin-bottom:20px;color:${textMain}}
-.about-body{font-size:1rem;color:${textMid};line-height:1.8}
-.about-visual{background:${bgCard};border:1px solid ${border};border-radius:24px;padding:36px;display:flex;flex-direction:column;gap:20px}
-.about-stat-row{display:flex;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid ${border}}
-.about-stat-row:last-child{border-bottom:none}
-.about-stat-num{font-size:2rem;font-weight:900;color:${primary};min-width:72px;letter-spacing:-.04em}
-.about-stat-desc{font-size:.9rem;color:${textMid};line-height:1.5}
+/* ─── IMAGE STRIP ────────────────────────────────────────────────── */
+.img-strip{display:flex;height:360px;overflow:hidden;border-top:1px solid ${border};border-bottom:1px solid ${border}}
+.strip-cell{flex:1;overflow:hidden;position:relative}
+.strip-cell img{width:100%;height:100%;object-fit:cover;transition:transform .8s cubic-bezier(.16,1,.3,1),filter .4s;filter:brightness(.85) saturate(.9)}
+.strip-cell:hover img{transform:scale(1.06);filter:brightness(1) saturate(1.1)}
+.strip-cell+.strip-cell{border-left:1px solid ${border}}
+@media(max-width:640px){.img-strip{height:220px}.strip-cell:nth-child(3){display:none}}
 
-/* ── CTA closing ──────────────────────────────────────────────────────── */
-.closing{padding:120px 24px;text-align:center;position:relative;overflow:hidden}
-.closing-orb{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;border-radius:50%;filter:blur(120px);background:radial-gradient(circle,${orbColor1},transparent 70%);pointer-events:none;z-index:0}
-.closing>*:not(.closing-orb){position:relative;z-index:1}
-.closing-headline{font-family:'Playfair Display',Georgia,serif;font-size:clamp(2.4rem,6vw,5rem);font-weight:900;line-height:1.05;letter-spacing:-.04em;margin-bottom:28px;color:${textMain}}
-.closing-sub{font-size:1.1rem;color:${textMid};max-width:500px;margin:0 auto 48px;line-height:1.7}
+/* ─── ABOUT SECTION ──────────────────────────────────────────────── */
+.about{padding:130px 56px;max-width:1200px;margin:0 auto}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:100px;align-items:start}
+.about-headline{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(2rem,4vw,3.2rem);font-weight:400;letter-spacing:-.025em;line-height:1.15;color:${textMain};margin-bottom:28px}
+.about-headline em{font-style:italic;color:${accent}}
+.about-body{font-size:1rem;color:${textMid};line-height:1.85;font-weight:300;margin-bottom:36px}
+.about-stats{display:flex;flex-direction:column;gap:0;border-top:1px solid ${border}}
+.about-stat{padding:24px 0;border-bottom:1px solid ${border};display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center}
+.about-stat-val{font-family:'DM Serif Display',Georgia,serif;font-size:2rem;font-weight:400;color:${accent};line-height:1}
+.about-stat-label{font-size:.85rem;color:${textMid};line-height:1.5;font-weight:300}
+@media(max-width:768px){.about-grid{grid-template-columns:1fr;gap:56px}.about{padding:80px 24px}}
 
-/* ── Footer ───────────────────────────────────────────────────────────── */
-footer{padding:32px 48px;background:${bgMuted};border-top:1px solid ${border};display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
-.footer-logo{font-weight:900;font-size:1.1rem;letter-spacing:-.03em;color:${textMid}}
-.footer-domain{font-size:.85rem;color:${textDim}}
+/* ─── MOSAIC / WORK SECTION ──────────────────────────────────────── */
+.mosaic-section{padding:0 56px 130px;max-width:1200px;margin:0 auto}
+.mosaic-inner{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.mosaic-copy .overline{margin-bottom:14px}
+.mosaic-headline{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(2rem,4vw,3.2rem);font-weight:400;letter-spacing:-.025em;line-height:1.1;color:${textMain};margin-bottom:20px}
+.mosaic-headline em{font-style:italic;color:${accent}}
+.mosaic-body{font-size:1rem;color:${textMid};line-height:1.8;font-weight:300;margin-bottom:36px}
+.cta-pill{display:inline-flex;align-items:center;gap:10px;padding:14px 30px;border:1.5px solid ${border};color:${textMid};border-radius:100px;font-size:.9rem;font-weight:500;transition:border-color .15s,color .15s,transform .15s}
+.cta-pill:hover{border-color:${accent};color:${accent};transform:translateY(-2px)}
+.mosaic-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:200px 200px;gap:10px}
+.mc-0{border-radius:16px;overflow:hidden;grid-row:span 2;background:${bgCard};border:1px solid ${border}}
+.mc-1,.mc-2,.mc-3{border-radius:16px;overflow:hidden;background:${bgCard};border:1px solid ${border}}
+.mosaic-grid [class^="mc-"] img{width:100%;height:100%;object-fit:cover;transition:transform .6s cubic-bezier(.16,1,.3,1);filter:brightness(.9)}
+.mosaic-grid [class^="mc-"]:hover img{transform:scale(1.05);filter:brightness(1)}
+@media(max-width:900px){.mosaic-inner{grid-template-columns:1fr}.mosaic-grid{grid-template-rows:160px;grid-template-columns:repeat(3,1fr)}.mc-0{grid-row:span 1}.mosaic-section{padding:0 24px 80px}}
+
+/* ─── CTA BANNER ─────────────────────────────────────────────────── */
+.cta-banner{margin:0 56px 56px;border:1px solid ${borderAccent};border-radius:24px;padding:80px 72px;background:linear-gradient(135deg,${bgCard} 0%,${bg} 100%);position:relative;overflow:hidden}
+.cta-banner::before{content:'';position:absolute;top:-120px;right:-80px;width:400px;height:400px;background:radial-gradient(circle,${glowAccent} 0%,transparent 65%);pointer-events:none}
+.cta-banner-inner{position:relative;z-index:1;display:grid;grid-template-columns:1fr auto;gap:48px;align-items:center}
+.cta-banner-h{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(1.8rem,3.5vw,3rem);font-weight:400;letter-spacing:-.025em;line-height:1.1;color:${textMain}}
+.cta-banner-sub{font-size:.95rem;color:${textMid};margin-top:12px;line-height:1.6;font-weight:300}
+.cta-banner-actions{display:flex;flex-direction:column;gap:12px;align-items:flex-end;flex-shrink:0}
+@media(max-width:768px){.cta-banner{margin:0 24px 40px;padding:52px 32px}.cta-banner-inner{grid-template-columns:1fr}.cta-banner-actions{align-items:flex-start}}
+
+/* ─── FOOTER ─────────────────────────────────────────────────────── */
+.footer{padding:48px 56px;border-top:1px solid ${border};display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:24px}
+.footer-left{}
+.footer-name{font-size:.95rem;font-weight:600;color:${textMain};letter-spacing:-.01em}
+.footer-domain{font-size:.8rem;color:${textDim};margin-top:4px}
 .footer-credit{font-size:.78rem;color:${textDim}}
-.footer-credit a{color:${primary};text-decoration:none;font-weight:700}
-.footer-credit a:hover{text-decoration:underline}
+.footer-credit a{color:${accent};transition:opacity .15s}
+.footer-credit a:hover{opacity:.7}
+@media(max-width:640px){.footer{padding:36px 24px;flex-direction:column;gap:16px}}
 
-/* ── AI badge ─────────────────────────────────────────────────────────── */
-.ai-badge{position:fixed;bottom:24px;right:24px;display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;font-size:.7rem;font-weight:700;background:rgba(0,245,160,.1);border:1px solid rgba(0,245,160,.3);color:#00f5a0;z-index:300;backdrop-filter:blur(12px)}
-.fallback-badge{background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.3);color:#ffc800}
-.claude-credit{font-size:.68rem;font-weight:500;opacity:.75;padding-left:8px;border-left:1px solid rgba(0,245,160,.3);margin-left:4px}
+/* ─── STICKY BOTTOM BAR ──────────────────────────────────────────── */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;z-index:99;display:flex;align-items:center;justify-content:space-between;padding:16px 40px;background:rgba(12,12,14,0.96);border-top:1px solid ${border};backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transform:translateY(100%);transition:transform .5s cubic-bezier(.16,1,.3,1)}
+.bottom-bar.visible{transform:translateY(0)}
+.bottom-bar-text{font-size:.85rem;color:${textMid};font-weight:300}
+.bottom-bar-text strong{color:${textMain};font-weight:600}
+.bottom-bar-cta{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;background:${accent};color:#fff;border-radius:100px;font-size:.85rem;font-weight:600;white-space:nowrap;transition:opacity .15s}
+.bottom-bar-cta:hover{opacity:.88}
+@media(max-width:640px){.bottom-bar{padding:14px 20px}.bottom-bar-text{display:none}}
 
-/* ── Sticky banner ────────────────────────────────────────────────────── */
-.banner{position:fixed;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:14px 36px;background:${navBg};border-top:1px solid ${navBdr};z-index:250;backdrop-filter:blur(16px)}
-.banner-text{font-size:.85rem;color:${textMid}}
-.banner-text strong{color:${textMain}}
-.banner-cta{padding:10px 24px;border-radius:10px;font-weight:700;font-size:.875rem;text-decoration:none;color:#fff;background:${primary};transition:opacity .15s,transform .15s}
-.banner-cta:hover{opacity:.88;transform:translateY(-1px)}
-
-/* ── Responsive ───────────────────────────────────────────────────────── */
-@media(max-width:1024px){.about-inner{grid-template-columns:1fr;gap:48px}}
-.feature-strip{overflow:hidden;border-top:1px solid ${border};border-bottom:1px solid ${border}}
-.feature-strip-inner{display:flex;height:300px}
-.feature-img-cell{flex:1;overflow:hidden;position:relative}
-.feature-img-cell img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s cubic-bezier(.16,1,.3,1)}
-.feature-img-cell:hover img{transform:scale(1.06)}
-.feature-img-cell+.feature-img-cell{border-left:1px solid ${border}}
-.work-section{padding:100px 48px;max-width:1360px;margin:0 auto}
-.work-inner{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
-.work-mosaic{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:190px 190px;gap:12px}
-.work-mosaic [class^="mosaic-"]{border-radius:14px;overflow:hidden;background:${bgCard};border:1px solid ${border};transition:transform .2s,box-shadow .2s}
-.work-mosaic [class^="mosaic-"]:hover{transform:translateY(-4px);box-shadow:0 20px 48px ${shadowColor}}
-.work-mosaic [class^="mosaic-"] img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s cubic-bezier(.16,1,.3,1)}
-.work-mosaic [class^="mosaic-"]:hover img{transform:scale(1.07)}
-.mosaic-0{grid-row:span 2}
-@media(max-width:900px){.work-inner{grid-template-columns:1fr}.work-mosaic{grid-template-rows:160px;grid-template-columns:repeat(3,1fr)}.mosaic-0{grid-row:span 1}}
-@media(max-width:600px){.feature-strip-inner{height:200px}.feature-img-cell:nth-child(3){display:none}.work-mosaic{grid-template-columns:repeat(2,1fr)}.work-mosaic [class^="mosaic-"]:nth-child(4){display:none}}
-
-@media(max-width:768px){
-  nav{padding:0 20px}
-  .nav-links{display:none}
-  .hero{padding:120px 20px 80px}
-  h1.hero-headline{font-size:clamp(2.6rem,10vw,4.5rem)}
-  .services-grid{grid-template-columns:1fr}
-  .trust-inner{gap:0}
-  .stat-item{min-width:50%;padding:16px 12px}
-  .stat-div{display:none}
-  footer{flex-direction:column;align-items:flex-start;padding:24px 20px}
-  .banner{padding:12px 20px}
-}
+/* ─── AI BADGE ───────────────────────────────────────────────────── */
+.ai-pill{position:fixed;top:84px;right:24px;z-index:99;padding:6px 14px;background:${bgCard};border:1px solid ${border};border-radius:100px;font-size:.7rem;font-weight:600;color:${textDim};letter-spacing:.04em}
+.ai-fallback{border-color:${border};color:${textDim}}
 </style>
 </head>
 <body>
 
 <!-- Nav -->
-<nav id="nav">
-  <a href="#" class="logo-wrap">${logoHTML}</a>
+<nav class="nav" id="nav">
+  <a href="#" class="nav-brand">${navLogoHTML}</a>
   <div class="nav-links">
     <a href="#services">Services</a>
     <a href="#about">About</a>
     <a href="#contact">Contact</a>
   </div>
-  <a href="#contact" class="nav-cta">${copy.cta} <span class="btn-arrow">→</span></a>
+  <a href="#contact" class="nav-cta">${copy.cta}</a>
 </nav>
 
 ${aiBadge}
 
 <!-- Hero -->
-<section class="hero">
+<section class="hero" id="top">
   <div class="hero-bg"></div>
-  ${heroBgImg ? '<div class="hero-bg-photo"></div><div class="hero-bg-vignette"></div>' : ''}
-  <div class="hero-grid"></div>
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  ${heroLogoHTML}
-  <div class="hero-eyebrow">✦ Premium Redesign Preview by RandyBuilds</div>
-  <h1 class="hero-headline"><span class="grad">${copy.headline}</span></h1>
-  <p class="hero-sub">${copy.subhead}</p>
-  <div class="cta-row">
-    <a href="#contact" class="btn-primary">${copy.cta} <span class="btn-arrow">→</span></a>
-    <a href="#services" class="btn-secondary">${copy.ctaSecondary} <span class="btn-arrow">↓</span></a>
+  ${heroBgImg ? '<div class="hero-photo"></div><div class="hero-photo-grad"></div>' : ""}
+  <div class="hero-noise"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    ${heroLogoHTML}
+    <span class="hero-eyebrow">${domain}</span>
+    <h1 class="hero-headline">${copy.headline.includes(" ") ? copy.headline.replace(/(\w+)\s*$/, "<em>$1</em>") : copy.headline}</h1>
+    <p class="hero-sub">${copy.subhead}</p>
+    <div class="hero-actions">
+      <a href="${data.phone ? phoneHref : data.email ? emailHref : "#contact"}" class="btn-fill">${copy.cta} →</a>
+      <a href="#services" class="btn-outline">See Our Services</a>
+    </div>
+    ${data.phone ? `<p class="hero-phone">Call us directly: <a href="${phoneHref}">${data.phone}</a></p>` : ""}
   </div>
-  ${contactPill}
+  <div class="hero-scroll"><span>scroll</span><div class="hero-scroll-line"></div></div>
 </section>
 
-<!-- Trust bar -->
-<section class="trust reveal">
-  <div class="trust-inner">${statsHTML}</div>
-</section>
+<!-- Ticker -->
+<div class="ticker">
+  <div class="ticker-track" id="ticker">
+    ${[...copy.services.map(s => s.title), data.businessName, copy.cta, domain, ...copy.services.map(s => s.title), data.businessName, copy.cta, domain].map(t => `<div class="ticker-item">${t}</div>`).join("")}
+  </div>
+</div>
 
 <!-- Services -->
-<section class="services-section" id="services">
-  <div class="reveal">
-    <div class="section-label">What We Do</div>
-    <h2 class="section-title">Services built to <span style="color:${primary}">perform</span></h2>
-    <p class="section-sub">Every service is designed to deliver results — not just check a box.</p>
+<section class="services" id="services">
+  <div class="section-header reveal">
+    <span class="overline">What We Do</span>
+    <h2 class="section-h">Services that <em>deliver</em></h2>
   </div>
-  <div class="services-grid">${servicesHTML}</div>
+  <div class="svc-list">
+    ${servicesHTML}
+  </div>
 </section>
 
-<!-- Image Gallery -->
-${serviceImages.length > 0 ? `
-<section class="feature-strip">
-  <div class="feature-strip-inner">
-    ${serviceImages.map((img: string) => `
-      <div class="feature-img-cell">
-        <img src="${img}" alt="${data.businessName}" loading="lazy" onerror="this.closest('.feature-img-cell').style.display='none'">
-      </div>
-    `).join("")}
-  </div>
-</section>
-` : ""}
-
-${extraImages.length > 0 ? `
-<section class="work-section reveal">
-  <div class="work-inner">
-    <div class="work-text">
-      <div class="section-label">On The Job</div>
-      <h2 class="section-title">Fleet-ready for <span style="color:${primary}">your site</span></h2>
-      <p class="section-sub">Every unit is maintained, load-tested, and ready to deploy. We keep your job site running.</p>
-      <a href="#contact" class="btn-primary" style="margin-top:28px;display:inline-flex">${copy.cta} <span class="btn-arrow">→</span></a>
-    </div>
-    <div class="work-mosaic">
-      ${extraImages.slice(0,4).map((img: string, i: number) => `
-        <div class="mosaic-${i}">
-          <img src="${img}" alt="${data.businessName} equipment" loading="lazy" onerror="this.closest('[class^=mosaic]').style.display='none'">
-        </div>
-      `).join("")}
-    </div>
-  </div>
-</section>
-` : ""}
+<!-- Image Strip -->
+${featureStripHTML}
 
 <!-- About -->
 <section class="about" id="about">
-  <div class="about-inner">
-    <div class="about-text reveal">
-      <div class="section-label">Our Story</div>
-      <h2 class="about-headline">Built on craft.<br>Backed by results.</h2>
-      <p class="about-body">${data.description || `${data.businessName} has been delivering exceptional results for clients who demand the best. Every project we take on is treated with precision, care, and a commitment to excellence that shows in the work.`}</p>
+  <div class="about-grid">
+    <div class="reveal-left">
+      <h2 class="about-headline">Built on craft.<br><em>Backed by results.</em></h2>
+      <p class="about-body">${data.description || `${data.businessName} has built a reputation on delivering quality work — the kind that holds up and keeps clients coming back.`}</p>
+      <a href="#contact" class="btn-fill">${copy.cta} →</a>
     </div>
-    <div class="about-visual reveal">
-      <div class="about-stat-row"><div class="about-stat-num" style="color:${primary}">100%</div><div class="about-stat-desc">Client satisfaction rate — we don't walk away until the job is done right.</div></div>
-      <div class="about-stat-row"><div class="about-stat-num" style="color:${primary}">Fast</div><div class="about-stat-desc">Quick turnaround without cutting corners. Efficient, professional, reliable.</div></div>
-      <div class="about-stat-row"><div class="about-stat-num" style="color:${primary}">${data.phone ? data.phone : "Local"}</div><div class="about-stat-desc">${data.phone ? "Call us directly — real people, no runaround." : `Proudly serving ${data.address ? data.address.split(",").slice(-2).join(",").trim() : "the local community"}.`}</div></div>
+    <div class="about-stats reveal-right">
+      <div class="about-stat"><span class="about-stat-val">100%</span><span class="about-stat-label">Client satisfaction — we don't close a job until it's right.</span></div>
+      <div class="about-stat"><span class="about-stat-val">Fast</span><span class="about-stat-label">Responsive, on-time, no runaround. We show up when you need us.</span></div>
+      <div class="about-stat"><span class="about-stat-val">${data.phone ? data.phone : "Local"}</span><span class="about-stat-label">${data.phone ? "Real people. Call us directly — no answering machines." : "Proudly serving the local community."}</span></div>
     </div>
   </div>
 </section>
 
-<!-- CTA Closing -->
-<section class="closing" id="contact">
-  <div class="closing-orb"></div>
-  <div class="reveal">
-    <h2 class="closing-headline">${copy.closingHeadline}</h2>
-    <p class="closing-sub">Ready to see results? Let's get started — no pressure, no runaround.</p>
-    <div class="cta-row">
-      <a href="${data.email ? `mailto:${data.email}` : data.phone ? `tel:${data.phone.replace(/\D/g,"")}` : "#"}" class="btn-primary">${copy.cta} <span class="btn-arrow">→</span></a>
-      <a href="${data.url}" target="_blank" rel="noopener" class="btn-secondary">View Current Site <span class="btn-arrow">↗</span></a>
+<!-- Mosaic -->
+${mosaicHTML}
+
+<!-- CTA Banner -->
+<div class="cta-banner reveal" id="contact">
+  <div class="cta-banner-inner">
+    <div>
+      <h2 class="cta-banner-h">${copy.closingHeadline}</h2>
+      <p class="cta-banner-sub">No pressure. No runaround. Let's talk about what you need.</p>
+    </div>
+    <div class="cta-banner-actions">
+      <a href="${data.email ? emailHref : data.phone ? phoneHref : data.url}" class="btn-fill">${copy.cta} →</a>
+      <a href="${data.url}" target="_blank" rel="noopener" class="btn-outline">View Current Site ↗</a>
     </div>
   </div>
-</section>
+</div>
 
 <!-- Footer -->
-<footer>
-  <div>
-    <div class="footer-logo">${data.businessName}</div>
+<footer class="footer">
+  <div class="footer-left">
+    <div class="footer-name">${data.businessName}</div>
     <div class="footer-domain">${domain}</div>
   </div>
-  <div class="footer-credit">Preview built by <a href="https://randybuilds.ca" target="_blank">RandyBuilds</a> — Alberta web design from $800</div>
+  <div class="footer-credit">Preview by <a href="https://randybuilds.ca" target="_blank">RandyBuilds</a> — Alberta web design from $800</div>
 </footer>
 
-<!-- Sticky banner -->
-<div class="banner">
-  <div class="banner-text">👀 <strong>Free redesign preview.</strong> This is what your site could look like in 2 weeks.</div>
-  <a href="https://randybuilds.ca" target="_blank" class="banner-cta">Get This Site →</a>
+<!-- Sticky bottom bar -->
+<div class="bottom-bar" id="bottom-bar">
+  <p class="bottom-bar-text"><strong>Free redesign preview.</strong> This is what your site could look like in 2 weeks.</p>
+  <a href="https://randybuilds.ca" target="_blank" class="bottom-bar-cta">Get This Site →</a>
 </div>
 
 <script>
-// ── Scroll reveal ────────────────────────────────────────────────────────
+// ── Nav solid on scroll ───────────────────────────────────────────────
+const nav = document.getElementById("nav");
+const bar = document.getElementById("bottom-bar");
+window.addEventListener("scroll", () => {
+  const y = window.scrollY;
+  nav.classList.toggle("solid", y > 40);
+  bar.classList.toggle("visible", y > window.innerHeight * 0.6);
+}, {passive:true});
+
+// ── Reveal on scroll ──────────────────────────────────────────────────
 const io = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if (e.isIntersecting) {
-      e.target.classList.add("visible");
-      // Also reveal child cards
-      e.target.querySelectorAll(".card").forEach(c => c.classList.add("visible"));
+      e.target.classList.add("in");
+      e.target.querySelectorAll(".svc-card").forEach(c => c.classList.add("in"));
     }
   });
-}, { threshold: 0.12 });
-document.querySelectorAll(".reveal, .services-grid").forEach(el => io.observe(el));
+}, {threshold: 0.08, rootMargin:"0px 0px -40px 0px"});
+document.querySelectorAll(".reveal,.reveal-left,.reveal-right,.svc-list").forEach(el => io.observe(el));
 
-// ── Nav shadow on scroll ─────────────────────────────────────────────────
-const nav = document.getElementById("nav");
-window.addEventListener("scroll", () => {
-  nav.classList.toggle("scrolled", window.scrollY > 20);
-}, { passive: true });
-
-// ── Shimmer headline on hover ─────────────────────────────────────────────
-const hl = document.querySelector(".hero-headline .grad");
-if (hl) hl.addEventListener("mouseenter", () => {
-  hl.style.animationDuration = "1s";
-});
-if (hl) hl.addEventListener("mouseleave", () => {
-  hl.style.animationDuration = "4s";
-});
+// ── Ticker clone for seamless loop ────────────────────────────────────
+const track = document.getElementById("ticker");
+if (track) {
+  const clone = track.cloneNode(true);
+  track.parentElement.appendChild(clone);
+}
 </script>
 </body>
 </html>`;
