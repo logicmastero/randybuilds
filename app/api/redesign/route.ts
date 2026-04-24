@@ -191,7 +191,7 @@ Output strict JSON only. No markdown, no explanation, no wrapper text. Just the 
 Business name: ${data.businessName}
 Vertical / industry: ${vertical.label}
 URL: ${data.url}
-Meta description: ${data.description || "Not provided"}
+Business description / user input: ${data.description || "Not provided"}
 Page H1 / main headline: ${data.headline || "Not provided"}
 Features/services found: ${servicesText}
 Location: ${data.address || "Not specified — assume digital/online if blank"}
@@ -1085,8 +1085,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data: ScrapedInput = body.scraped ?? body;
 
-    if (!data.businessName || !data.url) {
-      return NextResponse.json({ error: "businessName and url are required" }, { status: 400 });
+    // Allow description-only mode: populate missing fields from description
+    if (!data.businessName && data.description) {
+      data.businessName = data.description.split(/\s+/).slice(0, 4).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    }
+    if (!data.url || data.url === "https://example.com") {
+      data.url = "https://example.com";
+    }
+    if (!data.businessName) {
+      data.businessName = "Your Business";
     }
 
     const { copy, source, reason } = await generateRedesignCopy(data);
