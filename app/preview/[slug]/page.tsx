@@ -13,11 +13,11 @@ export async function generateMetadata({ params }: Props) {
   const preview = await getPreview(slug);
   if (!preview) return { title: "Preview Not Found — RandyBuilds" };
   return {
-    title: `${preview.businessName} — Premium Redesign Preview | RandyBuilds`,
-    description: `See what ${preview.businessName}'s website could look like with a professional redesign by RandyBuilds.`,
+    title: `${preview.businessName} — AI Redesign Preview | RandyBuilds`,
+    description: `See what ${preview.businessName}'s website could look like — then start editing it for free with AI.`,
     openGraph: {
-      title: `${preview.businessName} — Redesigned by RandyBuilds`,
-      description: `AI-powered premium redesign preview. Built in 60 seconds.`,
+      title: `${preview.businessName} — Redesigned by AI | RandyBuilds`,
+      description: `AI-powered redesign preview. Start editing for free in 60 seconds.`,
       type: "website",
     },
   };
@@ -26,7 +26,6 @@ export async function generateMetadata({ params }: Props) {
 export default async function PreviewPage({ params }: Props) {
   const { slug } = await params;
 
-  // Feature flag — shareable links gated until Upstash is provisioned
   const shareable = process.env.SHAREABLE_LINKS_ENABLED === "true" || isRedisConfigured();
 
   if (!shareable) {
@@ -52,8 +51,8 @@ export default async function PreviewPage({ params }: Props) {
             </p>
             <a href="/" style={{
               padding: "14px 32px",
-              background: "linear-gradient(135deg,#00f5a0,#00d9f5)",
-              color: "#000", borderRadius: "10px", fontWeight: 800,
+              background: "linear-gradient(135deg,#c8a96e,#a07840)",
+              color: "#0a0a08", borderRadius: "10px", fontWeight: 800,
               fontSize: ".95rem", textDecoration: "none", display: "inline-block",
             }}>Generate Preview →</a>
           </div>
@@ -65,45 +64,47 @@ export default async function PreviewPage({ params }: Props) {
   const preview = await getPreview(slug);
   if (!preview) notFound();
 
-  // Inject a "Get this site built" banner into the preview HTML
+  // Encode the preview data to pass to the builder
+  const encodedHtml = encodeURIComponent(preview.html);
+  const encodedName = encodeURIComponent(preview.businessName);
+  const encodedUrl = encodeURIComponent(preview.url);
+
+  // Banner injected into the preview iframe — updated to push into the AI builder
   const bannerScript = `
     <script>
       window.addEventListener('DOMContentLoaded', function() {
         var banner = document.createElement('div');
         banner.id = 'rb-banner';
         banner.innerHTML = \`
-          <div style="position:fixed;bottom:0;left:0;right:0;z-index:99999;background:rgba(8,8,8,0.95);backdrop-filter:blur(12px);border-top:1px solid #00f5a0;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;gap:16px;font-family:system-ui,sans-serif">
+          <div style="position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(10,10,8,0.96);backdrop-filter:blur(16px);border-bottom:1px solid rgba(200,169,110,0.3);display:flex;align-items:center;justify-content:space-between;padding:10px 20px;gap:16px;font-family:system-ui,sans-serif;flex-wrap:wrap;">
             <div>
-              <span style="color:#00f5a0;font-weight:700;font-size:14px">This is a RandyBuilds preview</span>
-              <span style="color:#555;font-size:13px;margin-left:12px">AI-generated redesign — yours from $800 CAD</span>
+              <span style="color:#c8a96e;font-weight:800;font-size:13px;letter-spacing:0.04em">✦ AI PREVIEW</span>
+              <span style="color:rgba(232,224,208,0.6);font-size:12px;margin-left:10px">This is a live AI redesign of ${preview.businessName}</span>
             </div>
-            <div style="display:flex;gap:10px;flex-shrink:0">
-              <a href="https://randybuilds.vercel.app#pricing" target="_blank"
-                style="padding:8px 20px;background:linear-gradient(135deg,#00f5a0,#00d9f5);color:#000;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none">
-                Get This Built →
-              </a>
-              <a href="https://randybuilds.vercel.app" target="_blank"
-                style="padding:8px 16px;background:#1a1a1a;border:1px solid #333;color:#888;border-radius:8px;font-size:13px;text-decoration:none">
+            <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">
+              <a href="/" style="padding:7px 14px;background:transparent;border:1px solid rgba(232,224,208,0.2);color:rgba(232,224,208,0.7);border-radius:8px;font-weight:600;font-size:12px;text-decoration:none;display:inline-block">
                 New Preview
+              </a>
+              <a href="/build-from-preview?slug=${slug}" style="padding:8px 20px;background:linear-gradient(135deg,#c8a96e,#a07840);color:#0a0a08;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;display:inline-block">
+                ✦ Start Editing This Site →
               </a>
             </div>
           </div>
         \`;
         document.body.appendChild(banner);
-        document.body.style.paddingBottom = '64px';
+        document.body.style.paddingTop = '50px';
       });
     </script>
   `;
 
-  // Inject banner before </body>
-  const htmlWithBanner = preview.html.replace("</body>", bannerScript + "</body>");
+  const htmlWithBanner = preview.html.replace("<head>", "<head>" + bannerScript);
 
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{preview.businessName} — Redesign Preview | RandyBuilds</title>
+        <title>{preview.businessName} — AI Redesign Preview | RandyBuilds</title>
       </head>
       <body
         style={{ margin: 0, padding: 0 }}
