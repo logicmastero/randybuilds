@@ -53,15 +53,20 @@ export default function Home() {
     return () => { document.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
   }, []);
 
-  // Update iframe when preview html changes
+  // Update iframe when preview html changes — use both step+html as deps so it fires after mount
   useEffect(() => {
-    if (!iframeRef.current || !preview?.html) return;
-    const doc = iframeRef.current.contentDocument;
-    if (!doc) return;
-    doc.open();
-    doc.write(preview.html);
-    doc.close();
-  }, [preview?.html]);
+    if (step !== "preview" || !preview?.html) return;
+    // Small delay to ensure iframe is in DOM after conditional render
+    const timer = setTimeout(() => {
+      if (!iframeRef.current) return;
+      const doc = iframeRef.current.contentDocument;
+      if (!doc) return;
+      doc.open();
+      doc.write(preview.html);
+      doc.close();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [step, preview?.html]);
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
