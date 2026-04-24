@@ -8,6 +8,7 @@ export interface ScrapeResult {
   description: string;
   colors: string[];
   logoUrl: string | null;
+  images: string[];
   phone: string | null;
   email: string | null;
   address: string | null;
@@ -51,6 +52,7 @@ export async function scrapeWebsite(url: string): Promise<ScrapeResult> {
     $('meta[property="og:title"]').attr("content") ||
     businessName;
 
+  // ── Colors ─────────────────────────────────────────────────────────────────
   const colorMatches: string[] = [];
   const styleContent = $("style").text() + $("[style]").map((_, el) => $(el).attr("style")).get().join(" ");
   const hexMatches = styleContent.match(/#[0-9a-fA-F]{6}\b/g) || [];
@@ -66,18 +68,83 @@ export async function scrapeWebsite(url: string): Promise<ScrapeResult> {
     .slice(0, 5);
   if (uniqueColors.length < 2) uniqueColors.push("#1a1a2e", "#e94560");
 
+  // ── Logo ───────────────────────────────────────────────────────────────────
   let logoUrl: string | null = null;
-  for (const sel of ['img[src*="logo"]','img[alt*="logo" i]','img[class*="logo" i]','header img']) {
+  for (const sel of [
+    'img[src*="logo"]',
+    'img[alt*="logo" i]',
+    'img[class*="logo" i]',
+    'header img',
+    'nav img',
+    '.header img',
+    '.navbar img',
+  ]) {
     const src = $(sel).first().attr("src");
-    if (src) { logoUrl = src.startsWith("http") ? src : new URL(src, url).href; break; }
+    if (src && !src.includes("data:")) {
+      logoUrl = src.startsWith("http") ? src : new URL(src, url).href;
+      break;
+    }
+  }
+  // Also check og:image as logo fallback if it looks like a logo/icon (small dimensions hint)
+  if (!logoUrl) {
+    const ogImg = $('meta[property="og:image"]').attr("content");
+    if (ogImg) logoUrl = ogImg;
   }
 
+  // ── Page images (for gallery) ─────────────────────────────────────────────
+  // Collect all meaningful images, deduplicate by unique media ID to avoid size variants
+  const rawImgSrcs: string[] = [];
+  $("img").each((_, el) => {
+    const src = $(el).attr("src");
+    if (src && !src.startsWith("data:") && src.length > 10) {
+      const abs = src.startsWith("http") ? src : (() => {
+        try { return new URL(src, url).href; } catch { return null; }
+      })();
+      if (abs) rawImgSrcs.push(abs);
+    }
+  });
+  // Also grab srcset and picture source elements
+  $("source, img").each((_, el) => {
+    const srcset = $(el).attr("srcset") || $(el).attr("data-srcset");
+    if (srcset) {
+      // Extract just the first URL from srcset
+      const first = srcset.split(",")[0].trim().split(" ")[0];
+      if (first && first.startsWith("http")) rawImgSrcs.push(first);
+    }
+  });
+
+  // Deduplicate: for CDN images with size variants, keep the highest resolution (r_1200)
+  // Group by unique media filename/ID
+  const mediaIdMap = new Map<string, string>();
+  for (const src of rawImgSrcs) {
+    // Extract unique media ID from URL — works for leadconnectorhq, filesafe, cloudinary patterns
+    const mediaMatch = src.match(/\/media\/([a-f0-9]{20,})/i) || src.match(/\/([a-f0-9]{20,})\./i);
+    if (mediaMatch) {
+      const mediaId = mediaMatch[1];
+      // Prefer r_1200 (highest res) — if we already have one, only replace with higher res
+      const existing = mediaIdMap.get(mediaId);
+      if (!existing || src.includes("r_1200") || (!existing.includes("r_1200") && src.includes("r_900"))) {
+        mediaIdMap.set(mediaId, src);
+      }
+    } else {
+      // Not a CDN image — add directly, dedup by full URL
+      mediaIdMap.set(src, src);
+    }
+  }
+
+  // Filter out likely icons, tracking pixels, tiny images
+  const SKIP_PATTERNS = /favicon|icon|pixel|tracker|1x1|badge|arrow|chevron|logo|spinner|loader|star|rating|avatar|profile|flag|sprite|placeholder/i;
+  const images = [...mediaIdMap.values()]
+    .filter(src => !SKIP_PATTERNS.test(src))
+    .slice(0, 12); // Max 12 gallery images
+
+  // ── Contact ─────────────────────────────────────────────────────────────────
   const pageText = $("body").text();
   const phoneMatch = pageText.match(/(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/);
   const emailMatch = pageText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
   const addressMatch = pageText.match(/\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Way|Blvd)[.,\s]+[A-Za-z\s]+[,\s]+[A-Z]{2}/);
 
-  // Social/nav blacklist — filter out junk that gets scraped as "services"
+  // ── Services ────────────────────────────────────────────────────────────────
   const SERVICE_BLACKLIST = new Set([
     "facebook","instagram","twitter","youtube","linkedin","tiktok","pinterest","yelp","google",
     "home","about","contact","menu","blog","news","login","sign in","sign up","register",
@@ -97,7 +164,6 @@ export async function scrapeWebsite(url: string): Promise<ScrapeResult> {
       services.push(text);
     }
   });
-  // Fallback — try list items if no h2/h3 services found
   if (services.length < 2) {
     $("li").each((_, el) => {
       const text = $(el).text().trim().replace(/\s+/g, " ");
@@ -114,6 +180,7 @@ export async function scrapeWebsite(url: string): Promise<ScrapeResult> {
     description:  description.trim(),
     colors:       uniqueColors,
     logoUrl,
+    images,
     phone:        phoneMatch   ? phoneMatch[1].trim()  : null,
     email:        emailMatch   ? emailMatch[0]          : null,
     address:      addressMatch ? addressMatch[0].trim() : null,
@@ -124,9 +191,6 @@ export async function scrapeWebsite(url: string): Promise<ScrapeResult> {
 }
 
 // ── Known-brand enrichment ────────────────────────────────────────────────────
-// Many high-traffic sites (Stripe, Shopify, etc.) block serverless fetchers via
-// Cloudflare. We seed their data so the scraper never returns empty for these.
-// Keyed on hostname patterns.
 interface BrandSeed {
   businessName: string;
   description: string;
@@ -140,7 +204,7 @@ const KNOWN_BRANDS: { pattern: RegExp; seed: BrandSeed }[] = [
     pattern: /stripe\.com/,
     seed: {
       businessName: "Stripe",
-      description: "Stripe powers online and in-person payment processing and financial solutions for businesses of all sizes. Accept payments, send payouts, and automate financial processes.",
+      description: "Stripe powers online and in-person payment processing and financial solutions for businesses of all sizes.",
       headline: "Financial infrastructure for the internet",
       services: ["Payments", "Billing & Subscriptions", "Stripe Connect", "Radar Fraud Detection", "Stripe Terminal", "Stripe Atlas"],
       colors: ["#635bff", "#0a2540"],
@@ -150,100 +214,20 @@ const KNOWN_BRANDS: { pattern: RegExp; seed: BrandSeed }[] = [
     pattern: /shopify\.com/,
     seed: {
       businessName: "Shopify",
-      description: "Build your business with Shopify — sell online, in-person, and everywhere in between. Millions of businesses trust Shopify to power their stores.",
+      description: "Build your business with Shopify — sell online, in-person, and everywhere in between.",
       headline: "Start selling with Shopify",
       services: ["Online Store", "Point of Sale", "Shopify Payments", "Shopify Plus", "Marketing & SEO", "Analytics & Reports"],
       colors: ["#96bf48", "#004c3f"],
     },
   },
   {
-    pattern: /square\.com|squareup\.com/,
-    seed: {
-      businessName: "Square",
-      description: "Square helps millions of sellers run their business — from secure credit card processing to point of sale solutions.",
-      headline: "Run your whole business with Square",
-      services: ["Point of Sale", "Online Store", "Square Payroll", "Square Appointments", "Square Capital", "Square Marketing"],
-      colors: ["#3e4348", "#28a745"],
-    },
-  },
-  {
-    pattern: /notion\.so/,
-    seed: {
-      businessName: "Notion",
-      description: "Notion is the all-in-one workspace where you can write, plan, collaborate and get organized — everything you need, in one tool.",
-      headline: "Your wiki, docs, and projects. Together.",
-      services: ["Docs & Notes", "Wikis", "Project Management", "Databases", "AI Writing", "Templates"],
-      colors: ["#000000", "#e9e5e3"],
-    },
-  },
-  {
-    pattern: /figma\.com/,
-    seed: {
-      businessName: "Figma",
-      description: "Figma is the collaborative interface design tool where teams build products together — from early concepts to final handoff.",
-      headline: "Design, prototype, and handoff in one place",
-      services: ["UI Design", "Prototyping", "FigJam Whiteboarding", "Dev Mode", "Design Systems", "Collaboration"],
-      colors: ["#f24e1e", "#a259ff"],
-    },
-  },
-  {
-    pattern: /vercel\.com/,
-    seed: {
-      businessName: "Vercel",
-      description: "Vercel is the platform for frontend developers — deploy faster with built-in CI/CD, edge functions, and global CDN.",
-      headline: "Develop. Preview. Ship.",
-      services: ["Next.js Hosting", "Edge Functions", "Analytics", "Preview Deployments", "Vercel AI SDK", "Infrastructure"],
-      colors: ["#000000", "#0070f3"],
-    },
-  },
-  {
-    pattern: /linear\.app/,
-    seed: {
-      businessName: "Linear",
-      description: "Linear is the issue tracking tool built for modern software teams — fast, streamlined, and opinionated.",
-      headline: "Linear is a better way to build products",
-      services: ["Issue Tracking", "Project Cycles", "Roadmaps", "GitHub Sync", "Slack Integration", "Analytics"],
-      colors: ["#5e6ad2", "#f2f2f2"],
-    },
-  },
-  {
-    pattern: /hubspot\.com/,
-    seed: {
-      businessName: "HubSpot",
-      description: "HubSpot's CRM platform has all the tools and integrations you need for marketing, sales, content management, and customer service.",
-      headline: "Grow better with HubSpot",
-      services: ["Marketing Hub", "Sales Hub", "Service Hub", "CMS Hub", "Operations Hub", "CRM"],
-      colors: ["#ff7a59", "#2d3e50"],
-    },
-  },
-  {
-    pattern: /salesforce\.com/,
-    seed: {
-      businessName: "Salesforce",
-      description: "Salesforce unites marketing, sales, commerce, service, and IT teams to drive customer success from a single platform.",
-      headline: "Bring companies and customers together",
-      services: ["Sales Cloud", "Service Cloud", "Marketing Cloud", "Commerce Cloud", "Tableau Analytics", "Slack"],
-      colors: ["#00a1e0", "#032d60"],
-    },
-  },
-  {
     pattern: /github\.com/,
     seed: {
       businessName: "GitHub",
-      description: "GitHub is where the world builds software. Millions of developers and companies build, ship, and maintain their software on GitHub.",
+      description: "GitHub is where the world builds software.",
       headline: "Where the world builds software",
       services: ["Code Repositories", "GitHub Actions CI/CD", "GitHub Copilot", "Code Review", "GitHub Pages", "Security Scanning"],
       colors: ["#24292f", "#0969da"],
-    },
-  },
-  {
-    pattern: /aws\.amazon\.com|amazonaws\.com/,
-    seed: {
-      businessName: "Amazon Web Services",
-      description: "AWS is the world's most comprehensive and broadly adopted cloud platform, offering over 200 fully featured services.",
-      headline: "The world's most adopted cloud",
-      services: ["Compute (EC2)", "Storage (S3)", "Databases (RDS)", "Machine Learning", "Serverless (Lambda)", "CDN (CloudFront)"],
-      colors: ["#ff9900", "#232f3e"],
     },
   },
 ];
@@ -251,12 +235,9 @@ const KNOWN_BRANDS: { pattern: RegExp; seed: BrandSeed }[] = [
 function enrichKnownBrand(scraped: ScrapeResult, href: string): ScrapeResult {
   let hostname = "";
   try { hostname = new URL(href).hostname.replace("www.", ""); } catch { return scraped; }
-
   const match = KNOWN_BRANDS.find(b => b.pattern.test(hostname));
   if (!match) return scraped;
-
   const seed = match.seed;
-  // Only enrich fields that came back thin from the scraper
   return {
     ...scraped,
     businessName: scraped.businessName || seed.businessName,
@@ -279,7 +260,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
     }
 
-    // Step 1 — scrape
     let scraped: ScrapeResult;
     try {
       scraped = await scrapeWebsite(parsed.href);
@@ -288,18 +268,18 @@ export async function POST(req: NextRequest) {
         businessName: parsed.hostname.replace("www.","").split(".")[0],
         description: "A local business ready for a premium online presence.",
         colors: ["#6366f1","#8b5cf6"],
-        logoUrl: null, phone: null, email: null, address: null,
+        logoUrl: null,
+        images: [],
+        phone: null, email: null, address: null,
         services: ["Our Services","Quality Work","Customer Care"],
         headline: "Welcome", url: parsed.href,
       };
     }
 
-    // Step 1b — enrich with known-brand data if scrape returned thin results
     scraped = enrichKnownBrand(scraped, parsed.href);
 
-    console.log(`[scrape] ${parsed.hostname} → businessName="${scraped.businessName}" headline="${scraped.headline.slice(0,60)}" services=${scraped.services.length} description=${scraped.description.length}chars`);
+    console.log(`[scrape] ${parsed.hostname} → businessName="${scraped.businessName}" images=${scraped.images.length} services=${scraped.services.length}`);
 
-    // Step 2 — pipe straight into /api/redesign (same process, no HTTP hop)
     const { POST: redesignHandler } = await import("../redesign/route");
     const redesignReq = new Request("http://localhost/api/redesign", {
       method: "POST",
@@ -309,7 +289,6 @@ export async function POST(req: NextRequest) {
     const redesignRes = await redesignHandler(new NextRequest(redesignReq));
     const redesignData = await redesignRes.json();
 
-    // Return merged payload to frontend
     return NextResponse.json({
       ...redesignData,
       previewHtml: redesignData.previewHtml ?? null,
@@ -318,6 +297,7 @@ export async function POST(req: NextRequest) {
         phone:    scraped.phone,
         email:    scraped.email,
         services: scraped.services,
+        images:   scraped.images,
       },
     });
   } catch (err) {
