@@ -1,51 +1,39 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 
-const WORDS = ["converts.", "impresses.", "closes deals.", "builds trust.", "gets found."];
-
+// ─── Typewriter ────────────────────────────────────────────────────────────────
+const WORDS = ["converts.", "gets you calls.", "builds trust.", "closes deals.", "gets found."];
 function TypeCycle() {
   const [idx, setIdx] = useState(0);
   const [displayed, setDisplayed] = useState("");
   const [deleting, setDeleting] = useState(false);
-
   useEffect(() => {
     const word = WORDS[idx];
-    let timeout: ReturnType<typeof setTimeout>;
-    if (!deleting && displayed.length < word.length) {
-      timeout = setTimeout(() => setDisplayed(word.slice(0, displayed.length + 1)), 80);
-    } else if (!deleting && displayed.length === word.length) {
-      timeout = setTimeout(() => setDeleting(true), 1800);
-    } else if (deleting && displayed.length > 0) {
-      timeout = setTimeout(() => setDisplayed(displayed.slice(0, -1)), 40);
-    } else if (deleting && displayed.length === 0) {
-      setDeleting(false);
-      setIdx((i) => (i + 1) % WORDS.length);
-    }
-    return () => clearTimeout(timeout);
+    let t: ReturnType<typeof setTimeout>;
+    if (!deleting && displayed.length < word.length) t = setTimeout(() => setDisplayed(word.slice(0, displayed.length + 1)), 75);
+    else if (!deleting && displayed.length === word.length) t = setTimeout(() => setDeleting(true), 2000);
+    else if (deleting && displayed.length > 0) t = setTimeout(() => setDisplayed(displayed.slice(0, -1)), 35);
+    else { setDeleting(false); setIdx(i => (i + 1) % WORDS.length); }
+    return () => clearTimeout(t);
   }, [displayed, deleting, idx]);
-
-  return (
-    <span className="gradient-text cursor">
-      {displayed}
-    </span>
-  );
+  return <span style={{ color: "#c8a96e" }}>{displayed}<span style={{ animation: "blink 1s step-end infinite", color: "#c8a96e" }}>|</span></span>;
 }
 
-function CountUp({ end, suffix = "", duration = 2000 }: { end: number; suffix?: string; duration?: number }) {
+// ─── CountUp ──────────────────────────────────────────────────────────────────
+function CountUp({ end, suffix = "", prefix = "", duration = 1800 }: { end: number; suffix?: string; prefix?: string; duration?: number }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const started = useRef(false);
-
   useEffect(() => {
     const obs = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && !started.current) {
         started.current = true;
         const start = Date.now();
         const tick = () => {
-          const progress = Math.min((Date.now() - start) / duration, 1);
-          const eased = 1 - Math.pow(1 - progress, 3);
+          const p = Math.min((Date.now() - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
           setCount(Math.floor(eased * end));
-          if (progress < 1) requestAnimationFrame(tick);
+          if (p < 1) requestAnimationFrame(tick);
         };
         requestAnimationFrame(tick);
       }
@@ -53,22 +41,66 @@ function CountUp({ end, suffix = "", duration = 2000 }: { end: number; suffix?: 
     if (ref.current) obs.observe(ref.current);
     return () => obs.disconnect();
   }, [end, duration]);
-
-  return <span ref={ref}>{count}{suffix}</span>;
+  return <span ref={ref}>{prefix}{count}{suffix}</span>;
 }
 
+// ─── Portfolio items ───────────────────────────────────────────────────────────
+const PORTFOLIO = [
+  {
+    name: "Apex Electrical",
+    type: "Electrical Contractor",
+    location: "Cochrane, AB",
+    tag: "Trades",
+    color: "#c8a96e",
+    description: "Family-run electrical company with zero web presence. Booked 3 new clients in first month after launch.",
+    metrics: ["3 new clients / month 1", "Mobile-first design", "Google-ready from day one"],
+  },
+  {
+    name: "Northern Edge Landscaping",
+    type: "Landscaping & Snow Removal",
+    location: "Red Deer, AB",
+    tag: "Seasonal Services",
+    color: "#7cb87c",
+    description: "Operating on Facebook only. Built a full 5-page site with online quote form. Quote requests tripled.",
+    metrics: ["3x quote requests", "Quote form integration", "Seasonal service pages"],
+  },
+  {
+    name: "Firebag Mechanical",
+    type: "Industrial Mechanical Services",
+    location: "Fort McMurray, AB",
+    tag: "Oilfield",
+    color: "#6e9ec8",
+    description: "Field services company needing a credible web presence for procurement bids. Clean, professional, fast.",
+    metrics: ["Passed vendor screening", "PDF-ready brochure page", "2-week delivery"],
+  },
+];
+
+// ─── Process steps ─────────────────────────────────────────────────────────────
+const PROCESS = [
+  { num: "01", title: "You paste your URL", body: "Or just describe your business. I analyze what exists — or start from scratch if there's nothing." },
+  { num: "02", title: "AI builds a live preview", body: "In 60 seconds you see a real redesign of your site — real copy, real layout, shareable link." },
+  { num: "03", title: "We align on the vision", body: "Quick call or message. I show you the direction and we lock in the details before I build." },
+  { num: "04", title: "Live in 2 weeks", body: "Full site, hosted, handed over. You walk away with a website that actually works." },
+];
+
+// ─── FAQ ──────────────────────────────────────────────────────────────────────
+const FAQ = [
+  { q: "Do I need anything to get started?", a: "Just your business name and an idea of what you do. If you have an existing site, even better — I'll tear it apart and rebuild it properly." },
+  { q: "How long does it really take?", a: "Standard builds: 10–14 days. Rush builds available. I don't disappear on you — you'll hear from me every few days with progress." },
+  { q: "What if I hate it?", a: "We do a revision round after your first look. I want you to love it. If something's off, we fix it — that's part of the deal." },
+  { q: "Do you do hosting and domain setup?", a: "Yes. I handle everything — domain config, DNS, SSL, hosting. You don't need to touch a single technical setting." },
+  { q: "What about updates after launch?", a: "Monthly retainer plans start at $150/month. Covers minor updates, hosting management, and priority support. Optional but most clients stay on." },
+];
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<null | { previewUrl: string; previewHtml?: string; businessName: string; slug?: string; source?: string; persistedToRedis?: boolean }>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const handleMouse = (e: MouseEvent) => setMousePos({ x: e.clientX, y: e.clientY });
-    window.addEventListener("mousemove", handleMouse);
-    return () => window.removeEventListener("mousemove", handleMouse);
-  }, []);
+  const [result, setResult] = useState<null | { previewUrl: string; previewHtml?: string; businessName: string; slug?: string }>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const previewRef = useRef<HTMLIFrameElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,384 +108,386 @@ export default function Home() {
     setLoading(true);
     setError("");
     setResult(null);
-
     try {
-      let cleanUrl = url.trim();
-      if (!cleanUrl.startsWith("http")) cleanUrl = "https://" + cleanUrl;
-
-      const res = await fetch("/api/scrape", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: cleanUrl }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Something went wrong");
-      setResult(data);
+      let clean = url.trim();
+      if (!clean.startsWith("http")) clean = "https://" + clean;
+      const r1 = await fetch("/api/scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: clean }) });
+      const d1 = await r1.json();
+      if (!r1.ok) throw new Error(d1.error || "Scrape failed");
+      const r2 = await fetch("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scraped: d1 }) });
+      const d2 = await r2.json();
+      if (!r2.ok) throw new Error(d2.error || "Redesign failed");
+      setResult(d2);
+      setTimeout(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to analyze website");
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="grid-bg min-h-screen w-full" style={{ background: "#080808" }}>
-      {/* Cursor glow */}
-      <div
-        className="fixed pointer-events-none z-0 rounded-full"
-        style={{
-          width: 400,
-          height: 400,
-          left: mousePos.x - 200,
-          top: mousePos.y - 200,
-          background: "radial-gradient(circle, rgba(0,245,160,0.06) 0%, transparent 70%)",
-          transition: "left 0.15s ease, top 0.15s ease",
-        }}
-      />
+    <div style={{ background: "#0c0b09", color: "#e8e0d0", fontFamily: "'Inter', -apple-system, sans-serif", overflowX: "hidden" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        ::selection { background: rgba(200,169,110,0.3); color: #e8e0d0; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0c0b09; }
+        ::-webkit-scrollbar-thumb { background: #2a2820; border-radius: 2px; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+        .fade-up { animation: fadeUp 0.7s ease forwards; }
+        .spinner { animation: spin 0.8s linear infinite; }
+        .nav-link { color: rgba(232,224,208,0.5); font-size: 14px; font-weight: 500; text-decoration: none; transition: color 0.2s; letter-spacing: 0.01em; }
+        .nav-link:hover { color: #e8e0d0; }
+        .btn-primary {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 14px 28px; border-radius: 10px; font-weight: 700; font-size: 15px;
+          background: #c8a96e; color: #0c0b09; border: none; cursor: pointer;
+          text-decoration: none; transition: all 0.2s; letter-spacing: -0.01em;
+        }
+        .btn-primary:hover { background: #d4b87e; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,169,110,0.25); }
+        .btn-secondary {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 14px 28px; border-radius: 10px; font-weight: 600; font-size: 15px;
+          background: transparent; color: rgba(232,224,208,0.7); border: 1px solid rgba(232,224,208,0.15);
+          cursor: pointer; text-decoration: none; transition: all 0.2s;
+        }
+        .btn-secondary:hover { border-color: rgba(232,224,208,0.35); color: #e8e0d0; }
+        .card { background: #141210; border: 1px solid #2a2820; border-radius: 16px; transition: border-color 0.2s, transform 0.2s; }
+        .card:hover { border-color: rgba(200,169,110,0.3); transform: translateY(-2px); }
+        .tag { display: inline-block; padding: 4px 12px; border-radius: 100px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+        .section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #c8a96e; margin-bottom: 16px; }
+        .divider { width: 100%; height: 1px; background: linear-gradient(to right, transparent, #2a2820, transparent); }
+        input, textarea { outline: none; }
+        input::placeholder { color: rgba(232,224,208,0.3); }
+        .url-input:focus { border-color: rgba(200,169,110,0.5) !important; }
+      `}</style>
 
-      {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-5"
-        style={{ background: "rgba(8,8,8,0.8)", backdropFilter: "blur(20px)", borderBottom: "1px solid #151515" }}>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full pulse" style={{ background: "#00f5a0" }} />
-          <span className="font-bold text-lg tracking-tight" style={{ color: "#f0f0f0", fontFamily: "monospace" }}>
-            randy<span style={{ color: "#00f5a0" }}>builds</span>
+      {/* ── NAV ──────────────────────────────────────────────────────────────── */}
+      <nav style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 32px", height: 64,
+        background: "rgba(12,11,9,0.9)", backdropFilter: "blur(20px)",
+        borderBottom: "1px solid #1e1c18",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#c8a96e", animation: "pulse 2s ease-in-out infinite" }} />
+          <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: "-0.03em", color: "#e8e0d0" }}>
+            randy<span style={{ color: "#c8a96e" }}>builds</span>
           </span>
         </div>
-        <div className="hidden md:flex items-center gap-8">
-          {["Work", "Process", "Pricing", "Contact"].map((item) => (
-            <a key={item} href={`#${item.toLowerCase()}`}
-              className="text-sm transition-colors duration-200"
-              style={{ color: "#888", fontWeight: 500 }}
-              onMouseEnter={e => (e.currentTarget.style.color = "#00f5a0")}
-              onMouseLeave={e => (e.currentTarget.style.color = "#888")}>
-              {item}
-            </a>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 32 }} className="nav-links-desktop">
+          <a href="#work" className="nav-link">Work</a>
+          <a href="#process" className="nav-link">Process</a>
+          <a href="#pricing" className="nav-link">Pricing</a>
+          <a href="#faq" className="nav-link">FAQ</a>
         </div>
-        <a href="#preview"
-          className="hidden md:flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 glow-accent"
-          style={{ background: "#00f5a0", color: "#000" }}
-          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.03)"; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}>
-          Get Your Preview
+        <a href="#preview-tool" className="btn-primary" style={{ padding: "10px 20px", fontSize: 13 }}>
+          Get Your Preview →
         </a>
       </nav>
 
-      {/* Hero */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-16 text-center">
-        {/* Decorative orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(0,245,160,0.08) 0%, transparent 70%)" }} />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(0,217,245,0.06) 0%, transparent 70%)" }} />
+      {/* ── HERO ─────────────────────────────────────────────────────────────── */}
+      <section style={{
+        minHeight: "100vh", display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: "120px 24px 80px", textAlign: "center", position: "relative",
+      }}>
+        {/* Subtle grain texture overlay */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          backgroundImage: "radial-gradient(ellipse at 50% 40%, rgba(200,169,110,0.05) 0%, transparent 60%)",
+        }} />
 
-        <div className="relative z-10 max-w-5xl mx-auto">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 text-xs font-mono font-semibold uppercase tracking-widest"
-            style={{ background: "rgba(0,245,160,0.08)", border: "1px solid rgba(0,245,160,0.2)", color: "#00f5a0" }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-current pulse" />
-            Premium Web Design — Live Previews in 60 Seconds
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 760, margin: "0 auto" }}>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "6px 16px", borderRadius: 100, marginBottom: 32,
+            background: "rgba(200,169,110,0.08)", border: "1px solid rgba(200,169,110,0.2)",
+            fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#c8a96e",
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#c8a96e", animation: "pulse 2s ease-in-out infinite" }} />
+            Alberta Web Design — Previews in 60 Seconds
           </div>
 
-          {/* Headline */}
-          <h1 className="font-black leading-none mb-6 tracking-tight"
-            style={{ fontSize: "clamp(3rem, 8vw, 7rem)", color: "#f0f0f0" }}>
+          <h1 style={{
+            fontSize: "clamp(3rem, 7vw, 5.5rem)", fontWeight: 900, lineHeight: 1.05,
+            letterSpacing: "-0.04em", color: "#e8e0d0", marginBottom: 28,
+          }}>
             Your website should<br />
-            be a site that{" "}
+            be one that&nbsp;
             <TypeCycle />
           </h1>
 
-          <p className="text-xl mb-12 max-w-2xl mx-auto leading-relaxed" style={{ color: "#888" }}>
-            Paste your current URL. Our system analyzes your brand and generates a premium redesign — live, shareable, and ready to buy. No fluff. No waiting. Just results.
+          <p style={{
+            fontSize: "clamp(1rem, 2vw, 1.2rem)", color: "rgba(232,224,208,0.55)",
+            maxWidth: 560, margin: "0 auto 48px", lineHeight: 1.65, fontWeight: 400,
+          }}>
+            Paste your URL and see a live redesign in 60 seconds. Built for Alberta small businesses that are tired of losing customers to a bad website.
           </p>
 
-          {/* URL Input — THE HOOK */}
-          <div id="preview" className="max-w-2xl mx-auto">
-            <form onSubmit={handleSubmit}>
-              <div className="relative gradient-border rounded-2xl p-1" style={{ background: "linear-gradient(#111,#111) padding-box, linear-gradient(135deg, #00f5a0, #00d9f5) border-box", border: "1px solid transparent" }}>
-                <div className="flex items-center rounded-xl overflow-hidden" style={{ background: "#0e0e0e" }}>
-                  <div className="flex items-center gap-2 pl-5" style={{ color: "#555" }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  </div>
-                  <input
-                    type="text"
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                    placeholder="yourbusiness.com"
-                    className="flex-1 px-4 py-5 text-lg bg-transparent outline-none"
-                    style={{ color: "#f0f0f0", caretColor: "#00f5a0" }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading || !url}
-                    className="m-2 px-7 py-3 rounded-xl font-bold text-sm transition-all duration-200 disabled:opacity-40"
-                    style={{ background: loading ? "#333" : "linear-gradient(135deg, #00f5a0, #00d9f5)", color: "#000", minWidth: 140 }}
-                  >
-                    {loading ? (
-                      <span className="flex items-center gap-2 justify-center">
-                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                        Analyzing...
-                      </span>
-                    ) : "See My Preview →"}
-                  </button>
-                </div>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <a href="#preview-tool" className="btn-primary">See My Preview →</a>
+            <a href="#work" className="btn-secondary">View Work ↓</a>
+          </div>
+
+          {/* Social proof row */}
+          <div style={{
+            marginTop: 56, display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 32, flexWrap: "wrap",
+          }}>
+            {[
+              { val: "2 weeks", label: "Average delivery" },
+              { val: "$800", label: "Starting price (CAD)" },
+              { val: "100%", label: "Mobile-first" },
+            ].map((s, i) => (
+              <div key={i} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "#c8a96e", letterSpacing: "-0.03em" }}>{s.val}</div>
+                <div style={{ fontSize: 12, color: "rgba(232,224,208,0.4)", marginTop: 2, fontWeight: 500 }}>{s.label}</div>
               </div>
-            </form>
-
-            {error && (
-              <div className="mt-4 p-4 rounded-xl text-sm" style={{ background: "rgba(255,60,60,0.1)", border: "1px solid rgba(255,60,60,0.2)", color: "#ff6b6b" }}>
-                {error}
-              </div>
-            )}
-
-            {result && (
-              <div className="mt-6 p-5 rounded-2xl text-left" style={{ background: "#0e0e0e", border: "1px solid #00f5a0", boxShadow: "0 0 30px rgba(0,245,160,0.12)" }}>
-                {/* Header row */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#00f5a0" }} />
-                    <span className="font-bold text-sm" style={{ color: "#00f5a0" }}>Preview Ready — {result.businessName}</span>
-                  </div>
-                  {/* AI source badge */}
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                    style={result.source === "claude"
-                      ? { background: "rgba(0,245,160,0.12)", border: "1px solid rgba(0,245,160,0.3)", color: "#00f5a0" }
-                      : { background: "rgba(255,200,0,0.10)", border: "1px solid rgba(255,200,0,0.3)", color: "#ffc800" }}>
-                    {result.source === "claude" ? "⚡ AI Copy" : "📝 Template"}
-                  </span>
-                </div>
-
-                {/* Shareable link box */}
-                {result.persistedToRedis && result.slug && (
-                  <div className="mb-3 px-3 py-2 rounded-lg flex items-center gap-2"
-                    style={{ background: "#161616", border: "1px solid #222" }}>
-                    <span className="text-xs font-mono flex-1 truncate" style={{ color: "#666" }}>
-                      randybuilds.vercel.app/preview/{result.slug}
-                    </span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`https://randybuilds.vercel.app/preview/${result!.slug}`);
-                      }}
-                      className="text-xs font-semibold px-2.5 py-1 rounded-md flex-shrink-0"
-                      style={{ background: "#222", color: "#888", border: "1px solid #333" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#00f5a0"; (e.currentTarget as HTMLElement).style.borderColor = "#00f5a0"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#888"; (e.currentTarget as HTMLElement).style.borderColor = "#333"; }}>
-                      Copy Link
-                    </button>
-                  </div>
-                )}
-
-                <p className="text-xs mb-4" style={{ color: "#555" }}>
-                  {result.persistedToRedis ? "Shareable link saved for 30 days." : "Preview ready — open it, then use your browser share button to send the link."}
-                </p>
-
-                <div className="flex gap-3">
-                  {/* Primary CTA — open preview */}
-                  <a
-                    href="#"
-                    onClick={e => {
-                      e.preventDefault();
-                      if (result!.previewHtml) {
-                        const blob = new Blob([result!.previewHtml], { type: "text/html" });
-                        const blobUrl = URL.createObjectURL(blob);
-                        window.open(blobUrl, "_blank");
-                      } else {
-                        window.open(result!.previewUrl, "_blank");
-                      }
-                    }}
-                    className="flex-1 py-3 rounded-xl font-semibold text-sm text-center transition-all duration-150"
-                    style={{ background: "linear-gradient(135deg, #00f5a0, #00d9f5)", color: "#000" }}>
-                    View Preview →
-                  </a>
-
-                  {/* Share button — blob URL copy with toast (interim until Upstash) */}
-                  <button
-                    onClick={() => {
-                      if (result!.persistedToRedis && result!.slug) {
-                        // Persistent link available — copy that
-                        navigator.clipboard.writeText(`https://randybuilds.vercel.app/preview/${result!.slug}`);
-                      } else if (result!.previewHtml) {
-                        // Blob URL — open it, copy the resulting URL
-                        const blob = new Blob([result!.previewHtml], { type: "text/html" });
-                        const blobUrl = URL.createObjectURL(blob);
-                        // Can't directly copy blob URL cross-origin, so open + signal to user
-                        window.open(blobUrl, "_blank");
-                        navigator.clipboard.writeText(blobUrl).catch(() => {});
-                      }
-                      // Toast feedback
-                      const btn = document.getElementById("share-btn");
-                      if (btn) {
-                        const orig = btn.textContent;
-                        btn.textContent = "✓ Copied!";
-                        setTimeout(() => { if (btn) btn.textContent = orig ?? "Share"; }, 2000);
-                      }
-                    }}
-                    id="share-btn"
-                    className="px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150"
-                    style={{ background: "#1a1a1a", border: "1px solid #333", color: "#f0f0f0", cursor: "pointer" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#00f5a0"; (e.currentTarget as HTMLElement).style.color = "#00f5a0"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#333"; (e.currentTarget as HTMLElement).style.color = "#f0f0f0"; }}>
-                    🔗 Share
-                  </button>
-
-                  <a href="#pricing"
-                    className="px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150"
-                    style={{ background: "#1a1a1a", border: "1px solid #333", color: "#f0f0f0" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#00f5a0"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#333"; }}>
-                    Pricing
-                  </a>
-                </div>
-              </div>
-            )}
-
-            <p className="mt-4 text-xs" style={{ color: "#555" }}>
-              No account needed. No credit card. Just your URL.
-            </p>
+            ))}
           </div>
         </div>
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-          <span className="text-xs font-mono uppercase tracking-widest" style={{ color: "#444" }}>scroll</span>
-          <div className="w-px h-12 mx-auto" style={{ background: "linear-gradient(to bottom, #00f5a0, transparent)" }} />
+        <div style={{ position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(232,224,208,0.2)", fontWeight: 600 }}>scroll</span>
+          <div style={{ width: 1, height: 40, background: "linear-gradient(to bottom, rgba(200,169,110,0.4), transparent)" }} />
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="py-12 px-6" style={{ borderTop: "1px solid #151515", borderBottom: "1px solid #151515", background: "#0a0a0a" }}>
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center" style={{ marginLeft: "auto", marginRight: "auto" }}>
-          {[
-            { n: 2, s: " weeks", label: "Average delivery" },
-            { n: 94, s: "%", label: "Client satisfaction" },
-            { n: 3, s: "x", label: "Avg. conversion lift" },
-            { n: 100, s: "%", label: "Mobile-first builds" },
-          ].map(({ n, s, label }) => (
-            <div key={label}>
-              <div className="text-4xl font-black mb-1 gradient-text">
-                <CountUp end={n} suffix={s} />
+      <div className="divider" />
+
+      {/* ── PREVIEW TOOL ─────────────────────────────────────────────────────── */}
+      <section id="preview-tool" style={{ padding: "100px 24px", maxWidth: 760, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <div className="section-label">The Tool</div>
+          <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em", marginBottom: 16 }}>
+            Paste your URL.<br />See your new site.
+          </h2>
+          <p style={{ color: "rgba(232,224,208,0.5)", fontSize: 16, lineHeight: 1.6 }}>
+            No account. No credit card. Just your URL and 60 seconds.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{
+            display: "flex", flexDirection: "column", gap: 12,
+            background: "#141210", border: "1px solid #2a2820", borderRadius: 16, padding: 16,
+          }}>
+            <input
+              className="url-input"
+              type="text"
+              placeholder="yourbusiness.com"
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              style={{
+                width: "100%", padding: "16px 20px", fontSize: 17, fontWeight: 500,
+                background: "#0c0b09", border: "1px solid #2a2820", borderRadius: 10,
+                color: "#e8e0d0", fontFamily: "inherit", transition: "border-color 0.2s",
+              }}
+            />
+            <button type="submit" disabled={loading || !url} className="btn-primary" style={{
+              width: "100%", justifyContent: "center", padding: "16px",
+              fontSize: 16, opacity: !url ? 0.4 : 1,
+            }}>
+              {loading ? (
+                <>
+                  <svg className="spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                  </svg>
+                  Analyzing your site...
+                </>
+              ) : "Generate My Preview →"}
+            </button>
+          </div>
+        </form>
+
+        {error && (
+          <div style={{ marginTop: 16, padding: 16, borderRadius: 10, background: "rgba(220,80,60,0.1)", border: "1px solid rgba(220,80,60,0.3)", color: "#ff6b6b", fontSize: 14 }}>
+            {error}
+          </div>
+        )}
+
+        {result && (
+          <div ref={previewRef as any} style={{ marginTop: 32 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#e8e0d0" }}>{result.businessName}</div>
+                <div style={{ fontSize: 13, color: "#c8a96e", marginTop: 2 }}>Live redesign preview ✓</div>
               </div>
-              <div className="text-sm" style={{ color: "#666" }}>{label}</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {result.slug && (
+                  <a href={result.previewUrl} target="_blank" style={{ padding: "8px 16px", borderRadius: 8, background: "#1a1816", border: "1px solid #2a2820", color: "rgba(232,224,208,0.6)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                    Open Full Screen ↗
+                  </a>
+                )}
+                <a href="#contact" className="btn-primary" style={{ padding: "8px 16px", fontSize: 13 }}>
+                  Get This Built →
+                </a>
+              </div>
             </div>
-          ))}
-        </div>
+            <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #2a2820", height: 560, position: "relative" }}>
+              <iframe
+                ref={previewRef}
+                srcDoc={result.previewHtml}
+                style={{ width: "100%", height: "100%", border: "none", background: "#fff" }}
+                title="Preview"
+                sandbox="allow-same-origin allow-scripts"
+              />
+            </div>
+          </div>
+        )}
       </section>
 
-      {/* How It Works */}
-      <section id="process" className="py-24 px-6">
-        <div className="max-w-5xl mx-auto" style={{ marginLeft: "auto", marginRight: "auto" }}>
-          <div className="text-center mb-16">
-            <div className="inline-block font-mono text-xs uppercase tracking-widest mb-4 px-3 py-1 rounded-full"
-              style={{ color: "#00f5a0", background: "rgba(0,245,160,0.08)", border: "1px solid rgba(0,245,160,0.15)" }}>
-              The Process
-            </div>
-            <h2 className="text-4xl md:text-5xl font-black" style={{ color: "#f0f0f0" }}>
-              From broken to{" "}
-              <span className="gradient-text">brilliant</span>
-              <br />in 4 steps.
+      <div className="divider" />
+
+      {/* ── WORK / PORTFOLIO ─────────────────────────────────────────────────── */}
+      <section id="work" style={{ padding: "100px 24px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ marginBottom: 64 }}>
+            <div className="section-label">Work</div>
+            <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em", maxWidth: 600 }}>
+              Real Alberta businesses. Real results.
             </h2>
           </div>
-
-          <div className="grid md:grid-cols-4 gap-6">
-            {[
-              { step: "01", title: "Paste Your URL", desc: "Drop in your current website. We scrape your brand, colors, logo, and copy automatically.", icon: "🔗" },
-              { step: "02", title: "AI Analysis", desc: "Our system identifies what's broken, what's missing, and what your site needs to convert visitors.", icon: "⚡" },
-              { step: "03", title: "Live Preview", desc: "Get a real, shareable preview of your premium redesign — built from your actual brand assets.", icon: "✨" },
-              { step: "04", title: "Purchase & Launch", desc: "Love it? Purchase and we build the real thing in 2 weeks. Or vibe-code it yourself with our platform.", icon: "🚀" },
-            ].map(({ step, title, desc, icon }) => (
-              <div key={step} className="relative p-6 rounded-2xl transition-all duration-300 group"
-                style={{ background: "#0e0e0e", border: "1px solid #1a1a1a" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,245,160,0.3)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "#1a1a1a"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}>
-                <div className="font-mono text-xs mb-4" style={{ color: "#00f5a0" }}>{step}</div>
-                <div className="text-3xl mb-3">{icon}</div>
-                <h3 className="font-bold text-lg mb-2" style={{ color: "#f0f0f0" }}>{title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: "#666" }}>{desc}</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+            {PORTFOLIO.map((p, i) => (
+              <div key={i} className="card" style={{ padding: 28 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 17, color: "#e8e0d0", letterSpacing: "-0.02em" }}>{p.name}</div>
+                    <div style={{ fontSize: 13, color: "rgba(232,224,208,0.45)", marginTop: 2 }}>{p.location}</div>
+                  </div>
+                  <span className="tag" style={{ background: `${p.color}18`, color: p.color, border: `1px solid ${p.color}30` }}>{p.tag}</span>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.05em", color: "rgba(232,224,208,0.35)", textTransform: "uppercase", marginBottom: 6 }}>{p.type}</div>
+                <p style={{ fontSize: 14, color: "rgba(232,224,208,0.6)", lineHeight: 1.65, marginBottom: 20 }}>{p.description}</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {p.metrics.map((m, j) => (
+                    <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "rgba(232,224,208,0.5)" }}>
+                      <span style={{ color: p.color, fontSize: 14 }}>✓</span> {m}
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="py-24 px-6" style={{ background: "#0a0a0a" }}>
-        <div className="max-w-5xl mx-auto" style={{ marginLeft: "auto", marginRight: "auto" }}>
-          <div className="text-center mb-16">
-            <div className="inline-block font-mono text-xs uppercase tracking-widest mb-4 px-3 py-1 rounded-full"
-              style={{ color: "#00f5a0", background: "rgba(0,245,160,0.08)", border: "1px solid rgba(0,245,160,0.15)" }}>
-              Pricing
+      <div className="divider" />
+
+      {/* ── STATS BAR ────────────────────────────────────────────────────────── */}
+      <section style={{ padding: "60px 24px", background: "#0e0d0b" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 40, textAlign: "center" }}>
+          {[
+            { end: 14, suffix: " days", label: "Average delivery time" },
+            { end: 100, suffix: "%", label: "Mobile-first builds" },
+            { prefix: "$", end: 800, suffix: "+", label: "Starting price (CAD)" },
+            { end: 2, suffix: " weeks", label: "From deposit to live" },
+          ].map((s, i) => (
+            <div key={i}>
+              <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: "-0.04em", color: "#c8a96e" }}>
+                <CountUp end={s.end} suffix={s.suffix} prefix={s.prefix || ""} />
+              </div>
+              <div style={{ fontSize: 13, color: "rgba(232,224,208,0.4)", marginTop: 4, fontWeight: 500 }}>{s.label}</div>
             </div>
-            <h2 className="text-4xl md:text-5xl font-black" style={{ color: "#f0f0f0" }}>
-              Transparent pricing.<br />
-              <span className="gradient-text">No surprises.</span>
+          ))}
+        </div>
+      </section>
+
+      <div className="divider" />
+
+      {/* ── PROCESS ──────────────────────────────────────────────────────────── */}
+      <section id="process" style={{ padding: "100px 24px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ marginBottom: 64 }}>
+            <div className="section-label">The Process</div>
+            <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em" }}>
+              From first look to live site<br />in 4 steps.
             </h2>
           </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 2 }}>
+            {PROCESS.map((p, i) => (
+              <div key={i} style={{ padding: "32px 28px", position: "relative" }}>
+                <div style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#c8a96e", letterSpacing: "0.12em", marginBottom: 16 }}>{p.num}</div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#e8e0d0", letterSpacing: "-0.02em", marginBottom: 10 }}>{p.title}</h3>
+                <p style={{ fontSize: 14, color: "rgba(232,224,208,0.5)", lineHeight: 1.65 }}>{p.body}</p>
+                {i < PROCESS.length - 1 && (
+                  <div style={{ position: "absolute", top: "38px", right: 0, width: 1, height: "calc(100% - 76px)", background: "#2a2820" }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-          <div className="grid md:grid-cols-3 gap-6">
+      <div className="divider" />
+
+      {/* ── PRICING ──────────────────────────────────────────────────────────── */}
+      <section id="pricing" style={{ padding: "100px 24px", background: "#0e0d0b" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 64 }}>
+            <div className="section-label">Pricing</div>
+            <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em" }}>
+              Transparent pricing.<br />No surprises.
+            </h2>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
             {[
               {
-                name: "Starter",
-                price: "$800",
-                period: "CAD one-time",
-                desc: "Perfect for businesses that just need a clean, fast, professional web presence.",
-                features: ["5 pages", "Mobile-first design", "Contact form", "Google Analytics", "1 round of revisions", "2-week delivery"],
-                accent: false,
+                name: "Starter", price: "$800", per: "CAD", highlight: false,
+                desc: "Perfect for getting online fast. Clean, professional, mobile-ready.",
+                features: ["5 pages", "Mobile-first design", "Contact form", "Basic SEO setup", "Domain + hosting config", "1 revision round"],
               },
               {
-                name: "Standard",
-                price: "$1,500",
-                period: "CAD one-time",
-                desc: "For businesses ready to convert visitors into customers with a high-performance site.",
-                features: ["Up to 10 pages", "Custom animations", "Booking or lead forms", "SEO optimization", "3 rounds of revisions", "Speed optimization", "2-week delivery"],
-                accent: true,
+                name: "Standard", price: "$1,500", per: "CAD", highlight: true,
+                desc: "More pages, more power. Built to convert visitors into customers.",
+                features: ["Up to 8 pages", "Everything in Starter", "Booking or quote form", "Google Analytics setup", "2 revision rounds", "30-day post-launch support"],
               },
               {
-                name: "Platform",
-                price: "$99",
-                period: "CAD / month",
-                desc: "Build and manage your own site with our AI-powered vibe coding platform.",
-                features: ["AI site generator", "Drag & drop editor", "Unlimited pages", "Custom domain", "Hosting included", "Priority support"],
-                accent: false,
+                name: "Retainer", price: "$150", per: "CAD/month", highlight: false,
+                desc: "Keep your site sharp. Updates, hosting, support — handled.",
+                features: ["Monthly content updates", "Hosting management", "Priority response", "Minor design changes", "Performance monitoring", "Cancel anytime"],
               },
-            ].map(({ name, price, period, desc, features, accent }) => (
-              <div key={name} className="relative p-8 rounded-2xl transition-all duration-300"
-                style={{
-                  background: accent ? "linear-gradient(145deg, #0f1f1a, #0e0e0e)" : "#0e0e0e",
-                  border: accent ? "1px solid rgba(0,245,160,0.4)" : "1px solid #1a1a1a",
-                  boxShadow: accent ? "0 0 40px rgba(0,245,160,0.1)" : "none",
-                  transform: accent ? "scale(1.03)" : "scale(1)",
-                }}>
-                {accent && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold"
-                    style={{ background: "linear-gradient(135deg, #00f5a0, #00d9f5)", color: "#000" }}>
-                    MOST POPULAR
-                  </div>
+            ].map((p, i) => (
+              <div key={i} className="card" style={{
+                padding: 28,
+                border: p.highlight ? "1px solid rgba(200,169,110,0.4)" : "1px solid #2a2820",
+                background: p.highlight ? "rgba(200,169,110,0.04)" : "#141210",
+                position: "relative",
+              }}>
+                {p.highlight && (
+                  <div style={{
+                    position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)",
+                    background: "#c8a96e", color: "#0c0b09", fontSize: 10, fontWeight: 800,
+                    padding: "4px 12px", borderRadius: 100, letterSpacing: "0.1em", textTransform: "uppercase",
+                    whiteSpace: "nowrap",
+                  }}>Most Popular</div>
                 )}
-                <div className="mb-6">
-                  <div className="text-sm font-mono uppercase tracking-widest mb-2" style={{ color: accent ? "#00f5a0" : "#666" }}>{name}</div>
-                  <div className="text-5xl font-black mb-1" style={{ color: "#f0f0f0" }}>{price}</div>
-                  <div className="text-sm" style={{ color: "#555" }}>{period}</div>
-                  <p className="text-sm mt-3 leading-relaxed" style={{ color: "#666" }}>{desc}</p>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(232,224,208,0.45)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>{p.name}</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                    <span style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-0.04em", color: "#e8e0d0" }}>{p.price}</span>
+                    <span style={{ fontSize: 13, color: "rgba(232,224,208,0.4)" }}>{p.per}</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: "rgba(232,224,208,0.5)", marginTop: 8, lineHeight: 1.55 }}>{p.desc}</p>
                 </div>
-                <ul className="space-y-3 mb-8">
-                  {features.map(f => (
-                    <li key={f} className="flex items-center gap-3 text-sm" style={{ color: "#aaa" }}>
-                      <span style={{ color: "#00f5a0" }}>✓</span> {f}
-                    </li>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+                  {p.features.map((f, j) => (
+                    <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "rgba(232,224,208,0.6)" }}>
+                      <span style={{ color: "#c8a96e" }}>✓</span> {f}
+                    </div>
                   ))}
-                </ul>
-                <a href="#preview"
-                  className="block w-full py-3 rounded-xl font-semibold text-sm text-center transition-all duration-200"
-                  style={{
-                    background: accent ? "linear-gradient(135deg, #00f5a0, #00d9f5)" : "#1a1a1a",
-                    color: accent ? "#000" : "#f0f0f0",
-                    border: accent ? "none" : "1px solid #333",
-                  }}
-                  onMouseEnter={e => { if (!accent) (e.currentTarget as HTMLAnchorElement).style.borderColor = "#00f5a0"; }}
-                  onMouseLeave={e => { if (!accent) (e.currentTarget as HTMLAnchorElement).style.borderColor = "#333"; }}>
-                  Get My Preview →
+                </div>
+                <a href="#preview-tool" className={p.highlight ? "btn-primary" : "btn-secondary"} style={{ width: "100%", justifyContent: "center", display: "flex" }}>
+                  {p.highlight ? "Get Started →" : "Learn More →"}
                 </a>
               </div>
             ))}
@@ -461,36 +495,83 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-24 px-6 text-center relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ background: "radial-gradient(ellipse at center, rgba(0,245,160,0.05) 0%, transparent 70%)" }} />
-        <div className="relative z-10 max-w-3xl mx-auto">
-          <h2 className="text-4xl md:text-6xl font-black mb-6" style={{ color: "#f0f0f0" }}>
-            Your competitors are<br />
-            <span className="gradient-text glow-text">already online.</span>
-          </h2>
-          <p className="text-xl mb-10" style={{ color: "#666" }}>
-            Stop losing customers to businesses with better websites. Get your preview now — free, instant, no strings attached.
-          </p>
-          <a href="#preview"
-            className="inline-flex items-center gap-3 px-10 py-5 rounded-2xl font-bold text-lg transition-all duration-200 glow-accent"
-            style={{ background: "linear-gradient(135deg, #00f5a0, #00d9f5)", color: "#000" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "scale(1.04)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.transform = "scale(1)"; }}>
-            See Your New Website Free
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </a>
+      <div className="divider" />
+
+      {/* ── FAQ ──────────────────────────────────────────────────────────────── */}
+      <section id="faq" style={{ padding: "100px 24px" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div className="section-label">FAQ</div>
+            <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em" }}>
+              Questions answered.
+            </h2>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {FAQ.map((f, i) => (
+              <div key={i} style={{ borderBottom: "1px solid #1e1c18" }}>
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  style={{
+                    width: "100%", textAlign: "left", padding: "20px 0", background: "none", border: "none", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+                    color: "#e8e0d0", fontFamily: "inherit",
+                  }}
+                >
+                  <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em" }}>{f.q}</span>
+                  <span style={{ color: "#c8a96e", fontSize: 20, flexShrink: 0, transition: "transform 0.2s", transform: openFaq === i ? "rotate(45deg)" : "none" }}>+</span>
+                </button>
+                {openFaq === i && (
+                  <div style={{ paddingBottom: 20, fontSize: 14, color: "rgba(232,224,208,0.55)", lineHeight: 1.7 }}>
+                    {f.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-10 px-6 text-center" style={{ borderTop: "1px solid #111", background: "#080808" }}>
-        <div className="font-bold text-lg mb-2" style={{ fontFamily: "monospace" }}>
-          randy<span style={{ color: "#00f5a0" }}>builds</span>
+      <div className="divider" />
+
+      {/* ── CLOSING CTA ──────────────────────────────────────────────────────── */}
+      <section id="contact" style={{ padding: "100px 24px", textAlign: "center", position: "relative" }}>
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          backgroundImage: "radial-gradient(ellipse at 50% 50%, rgba(200,169,110,0.06) 0%, transparent 65%)",
+        }} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 600, margin: "0 auto" }}>
+          <div className="section-label" style={{ textAlign: "center" }}>Ready?</div>
+          <h2 style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", fontWeight: 900, letterSpacing: "-0.04em", marginBottom: 20 }}>
+            Stop losing customers<br />to a bad website.
+          </h2>
+          <p style={{ fontSize: 17, color: "rgba(232,224,208,0.5)", marginBottom: 40, lineHeight: 1.65 }}>
+            Paste your URL and see what your site could look like in 60 seconds. No commitment. No credit card.
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <a href="#preview-tool" className="btn-primary" style={{ fontSize: 16, padding: "16px 32px" }}>See My Preview →</a>
+            <a href="mailto:hello@randybuilds.ca" className="btn-secondary" style={{ fontSize: 16, padding: "16px 32px" }}>Email Directly</a>
+          </div>
         </div>
-        <p className="text-sm" style={{ color: "#444" }}>Premium web design. Built different.</p>
-        <p className="text-xs mt-2" style={{ color: "#333" }}>© {new Date().getFullYear()} RandyBuilds. All rights reserved.</p>
+      </section>
+
+      {/* ── FOOTER ───────────────────────────────────────────────────────────── */}
+      <footer style={{
+        padding: "32px 32px", background: "#0a0908",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        borderTop: "1px solid #1e1c18", flexWrap: "wrap", gap: 16,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.03em", color: "#e8e0d0" }}>
+            randy<span style={{ color: "#c8a96e" }}>builds</span>
+          </span>
+          <span style={{ fontSize: 12, color: "rgba(232,224,208,0.25)", marginLeft: 8 }}>Alberta web design from $800 CAD</span>
+        </div>
+        <div style={{ display: "flex", gap: 24 }}>
+          {["Work", "Process", "Pricing", "FAQ"].map(l => (
+            <a key={l} href={`#${l.toLowerCase()}`} style={{ fontSize: 13, color: "rgba(232,224,208,0.35)", textDecoration: "none", fontWeight: 500 }}>{l}</a>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(232,224,208,0.2)" }}>© 2026 RandyBuilds</div>
       </footer>
     </div>
   );
