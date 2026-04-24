@@ -34,6 +34,7 @@ export default function Home() {
   const [scrapeProgress, setScrapeProgress] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const previewHtmlRef = useRef<string>("");
 
   // Cursor tracking
   useEffect(() => {
@@ -53,20 +54,30 @@ export default function Home() {
     return () => { document.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
   }, []);
 
-  // Update iframe when preview html changes — use both step+html as deps so it fires after mount
+  // Write HTML to iframe — called both on mount (callback ref) and on html change
+  const writeToIframe = useCallback((iframe: HTMLIFrameElement | null, html: string) => {
+    if (!iframe || !html) return;
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+  }, []);
+
+  // Callback ref — fires immediately when iframe mounts in DOM
+  const iframeCallbackRef = useCallback((node: HTMLIFrameElement | null) => {
+    if (node) {
+      iframeRef.current = node;
+      if (previewHtmlRef.current) writeToIframe(node, previewHtmlRef.current);
+    }
+  }, [writeToIframe]);
+
+  // Also update iframe when html changes (e.g. after async generation completes)
   useEffect(() => {
     if (step !== "preview" || !preview?.html) return;
-    // Small delay to ensure iframe is in DOM after conditional render
-    const timer = setTimeout(() => {
-      if (!iframeRef.current) return;
-      const doc = iframeRef.current.contentDocument;
-      if (!doc) return;
-      doc.open();
-      doc.write(preview.html);
-      doc.close();
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [step, preview?.html]);
+    previewHtmlRef.current = preview.html;
+    writeToIframe(iframeRef.current, preview.html);
+  }, [step, preview?.html, writeToIframe]);
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -485,7 +496,7 @@ export default function Home() {
           {/* iframe preview */}
           <div style={{ flex: 1, position: "relative", minHeight: "70vh" }}>
             <iframe
-              ref={iframeRef}
+              ref={iframeCallbackRef}
               style={{ width: "100%", height: "100%", border: "none", display: "block", minHeight: "70vh" }}
               title="Site Preview"
               sandbox="allow-scripts allow-same-origin"
