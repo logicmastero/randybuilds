@@ -14,6 +14,7 @@ interface ScrapedInput {
   address: string | null;
   colors: string[];
   logoUrl: string | null;
+  images: string[];
   url: string;
 }
 
@@ -405,6 +406,7 @@ function buildFallbackCopy(data: ScrapedInput, vertical?: VerticalProfile): Rede
 
 function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claude" | "fallback"): string {
   // ── Color system ────────────────────────────────────────────────────────────
+  const images = (data as ScrapedInput & { images?: string[] }).images ?? [];
   const primary   = data.colors[0] || "#2563eb";
   const secondary = data.colors[1] || primary;
 
@@ -600,6 +602,17 @@ footer{padding:32px 48px;background:${bgMuted};border-top:1px solid ${border};di
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media(max-width:1024px){.about-inner{grid-template-columns:1fr;gap:48px}}
+.gallery-section{padding:120px 48px;max-width:1400px;margin:0 auto}
+.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
+.gallery-item{border-radius:16px;overflow:hidden;aspect-ratio:4/3;background:${bgCard};border:1px solid ${border};transition:transform .2s,box-shadow .2s;cursor:pointer}
+.gallery-item:hover{transform:scale(1.02);box-shadow:0 16px 48px ${shadowColor}}
+.gallery-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s cubic-bezier(.16,1,.3,1)}
+.gallery-item:hover img{transform:scale(1.06)}
+.gallery-item:nth-child(1){grid-column:span 2;aspect-ratio:16/9}
+.gallery-item:nth-child(5){grid-column:span 2;aspect-ratio:16/9}
+@media(max-width:768px){.gallery-grid{grid-template-columns:repeat(2,1fr)}.gallery-item:nth-child(1),.gallery-item:nth-child(5){grid-column:span 2}}
+@media(max-width:480px){.gallery-grid{grid-template-columns:1fr}.gallery-item:nth-child(1),.gallery-item:nth-child(5){grid-column:span 1;aspect-ratio:4/3}}
+
 @media(max-width:768px){
   nav{padding:0 20px}
   .nav-links{display:none}
@@ -660,6 +673,23 @@ ${aiBadge}
   </div>
   <div class="services-grid">${servicesHTML}</div>
 </section>
+
+<!-- Image Gallery -->
+${images.length > 0 ? `
+<section class="gallery-section" id="gallery">
+  <div class="reveal">
+    <div class="section-label">Our Equipment & Work</div>
+    <h2 class="section-title">See what we <span style="color:${primary}">deliver</span></h2>
+  </div>
+  <div class="gallery-grid reveal">
+    ${images.slice(0, 9).map((img: string, i: number) => `
+      <div class="gallery-item" style="--i:${i}">
+        <img src="${img}" alt="${data.businessName} equipment photo ${i+1}" loading="lazy" onerror="this.closest('.gallery-item').style.display='none'">
+      </div>
+    `).join("")}
+  </div>
+</section>
+` : ""}
 
 <!-- About -->
 <section class="about" id="about">
