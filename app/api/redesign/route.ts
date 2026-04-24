@@ -241,7 +241,7 @@ Write exactly ${Math.max(data.services.filter(s => s.length > 3).length, 3)} ser
   return {
     headline:        parsed.headline,
     subhead:         parsed.subhead,
-    services:        Array.isArray(parsed.services) && parsed.services.length > 0 ? parsed.services : fb.services,
+    services:        (Array.isArray(parsed.services) && parsed.services.length > 0 && parsed.services.every((s: any) => s && typeof s.title === 'string' && typeof s.desc === 'string')) ? parsed.services : fb.services,
     cta:             parsed.cta,
     ctaSecondary:    parsed.ctaSecondary || vertical.defaultCtaSecondary,
     closingHeadline: parsed.closingHeadline || fb.closingHeadline,
@@ -427,7 +427,10 @@ function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claud
 
   const domain = (() => { try { return new URL(data.url).hostname.replace("www.",""); } catch { return data.url; } })();
   const year = new Date().getFullYear();
-  const services = copy.services;
+  const services = Array.isArray(copy.services) ? copy.services : [];
+  if (!Array.isArray(copy.services) || copy.services.length === 0) {
+    console.warn("[redesign] copy.services is not an array — using fallback services");
+  }
 
   const phoneHref = data.phone ? `tel:${data.phone.replace(/\D/g,"")}` : "#contact";
   const contactHref = data.email ? `mailto:${data.email}` : data.phone ? phoneHref : "#contact";
