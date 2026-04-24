@@ -65,11 +65,56 @@ export default function Home() {
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!url.trim()) { inputRef.current?.focus(); return; }
+    const raw = url.trim();
+    if (!raw) { inputRef.current?.focus(); return; }
     setError("");
 
-    let clean = url.trim();
-    if (!clean.startsWith("http")) clean = "https://" + clean;
+    // ── Detect: is this a URL or a text description? ───────────────────────
+    const looksLikeUrl = /^(https?:\/\/)|(\w[\w-]*\.\w{2,}(\/.*)?)$/.test(raw) &&
+      !raw.includes(" ") && raw.length < 120;
+
+    if (!looksLikeUrl) {
+      // ── Description mode — skip scrape, go straight to redesign ──────────
+      setStep("generating");
+      setScrapeProgress("Building your site from your description…");
+
+      try {
+        const r2 = await fetch("/api/redesign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scraped: {
+              businessName: extractBusinessNameFromDescription(raw),
+              description: raw,
+              url: "https://example.com",
+              services: [],
+              colors: [],
+              images: [],
+              headline: "",
+              phone: null,
+              email: null,
+              address: null,
+              logoUrl: null,
+            },
+          }),
+        });
+        const d2 = await r2.json();
+        if (!r2.ok) throw new Error(d2.error || "Generation failed");
+        setPreview({
+          html: d2.html || d2.previewHtml || "",
+          businessName: d2.businessName || extractBusinessNameFromDescription(raw),
+          sourceUrl: "",
+        });
+        setStep("preview");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+        setStep("error");
+      }
+      return;
+    }
+
+    // ── URL mode ───────────────────────────────────────────────────────────
+    const clean = raw.startsWith("http") ? raw : "https://" + raw;
 
     // ── Step 1: Scrape ─────────────────────────────────────────────────────
     setStep("scraping");
@@ -86,9 +131,8 @@ export default function Home() {
       if (!r1.ok) throw new Error(d1.error || "Scrape failed");
       scraped = d1;
       setScrapeProgress("Found your content — generating preview…");
-    } catch (err) {
-      // Fallback: try generating without scrape data
-      scraped = { url: clean, businessName: extractDomainName(clean), description: "", services: [], colors: [], images: [], headline: "", phone: null, email: null, address: null };
+    } catch {
+      scraped = { url: clean, businessName: extractDomainName(clean), description: "", services: [], colors: [], images: [], headline: "", phone: null, email: null, address: null, logoUrl: null };
       setScrapeProgress("Couldn't scrape — generating from URL…");
     }
 
@@ -592,4 +636,24 @@ function extractDomainName(url: string): string {
   } catch {
     return "Your Business";
   }
+}
+
+function extractBusinessNameFromDescription(desc: string): string {
+  // Try to pull a proper noun / business name from phrases like:
+  // "I run Smith Plumbing in Calgary"
+  // "My company is ABC Roofing"
+  // "coffee shop called Grounds & Glory"
+  const patterns = [
+    /called\s+([A-Z][A-Za-z0-9 &'-]{1,40})/,
+    /named\s+([A-Z][A-Za-z0-9 &'-]{1,40})/,
+    /(?:company|business|shop|firm|studio|agency)\s+is\s+([A-Z][A-Za-z0-9 &'-]{1,40})/,
+    /^([A-Z][A-Za-z0-9 &'-]{1,40})\s+(?:is|are|provides|offers|does)/,
+  ];
+  for (const p of patterns) {
+    const m = desc.match(p);
+    if (m?.[1]) return m[1].trim();
+  }
+  // Fall back: first 3 meaningful words capitalized
+  const words = desc.replace(/[^a-zA-Z0-9 ]/g, " ").split(/\s+/).filter(w => w.length > 2).slice(0, 3);
+  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") || "Your Business";
 }
