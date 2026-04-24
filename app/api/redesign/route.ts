@@ -432,6 +432,15 @@ function buildPreviewHTML(data: ScrapedInput, copy: RedesignCopy, source: "claud
     console.warn("[redesign] copy.services is not an array — using fallback services");
   }
 
+  // Build serviceItems array from copy.services for work rows
+  const serviceItems = Array.isArray(copy.services) 
+    ? copy.services.filter(s => s && typeof s.title === 'string' && typeof s.desc === 'string')
+    : [];
+  
+  if (serviceItems.length === 0) {
+    console.warn("[redesign] No valid service items for display — copy.services may be malformed");
+  }
+
   const phoneHref = data.phone ? `tel:${data.phone.replace(/\D/g,"")}` : "#contact";
   const contactHref = data.email ? `mailto:${data.email}` : data.phone ? phoneHref : "#contact";
 
