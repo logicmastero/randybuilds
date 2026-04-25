@@ -43,7 +43,7 @@ function detectVertical(data: ScrapedInput): VerticalProfile {
     data.businessName,
     data.description,
     data.headline,
-    ...data.services,
+    ...(Array.isArray(data.services) ? data.services : []),
   ].join(" ").toLowerCase();
 
   const domain = (() => {
@@ -1098,6 +1098,9 @@ export async function POST(req: NextRequest) {
     const data: ScrapedInput = body.scraped ?? body;
 
     // Allow description-only mode: populate missing fields from description
+    if (body.input && !data.description) {
+      data.description = body.input;
+    }
     if (!data.businessName && data.description) {
       data.businessName = data.description.split(/\s+/).slice(0, 4).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     }
@@ -1107,6 +1110,16 @@ export async function POST(req: NextRequest) {
     if (!data.businessName) {
       data.businessName = "Your Business";
     }
+    // Normalize all array fields — prevent "is not iterable" crashes
+    if (!Array.isArray(data.services)) data.services = [];
+    if (!Array.isArray((data as any).images)) (data as any).images = [];
+    if (!Array.isArray(data.colors)) data.colors = [];
+    if (!data.headline) data.headline = "";
+    if (!data.description) data.description = "";
+    if (!data.phone) data.phone = null;
+    if (!data.email) data.email = null;
+    if (!data.address) data.address = null;
+    if (!data.logoUrl) data.logoUrl = null;
 
     const { copy, source, reason } = await generateRedesignCopy(data);
     const html = buildPreviewHTML(data, copy, source);
@@ -1140,4 +1153,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to generate redesign", detail: msg }, { status: 500 });
   }
 }
+
 
