@@ -134,8 +134,20 @@ export default function Home() {
         const r = await fetch("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scraped: { businessName: extractBusinessNameFromDescription(raw), description: raw, url: "https://example.com", services: [], colors: [], images: [], headline: "", phone: null, email: null, address: null, logoUrl: null } }) });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || "Generation failed");
-        setPreview({ html: d.html || d.previewHtml || "", businessName: d.businessName || extractBusinessNameFromDescription(raw), sourceUrl: "" });
+        const pv = { html: d.html || d.previewHtml || "", businessName: d.businessName || extractBusinessNameFromDescription(raw), sourceUrl: "" };
+        setPreview(pv);
         setStep("preview");
+        // Save to user's account if logged in
+        try {
+          const sb = getSupabaseClient();
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user) {
+            const projectId = `proj_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+            const existing = JSON.parse(localStorage.getItem(`sc_projects_${session.user.id}`) || "[]");
+            existing.unshift({ id: projectId, businessName: pv.businessName, sourceUrl: pv.sourceUrl, createdAt: new Date().toISOString() });
+            localStorage.setItem(`sc_projects_${session.user.id}`, JSON.stringify(existing.slice(0,50)));
+          }
+        } catch { /* non-blocking */ }
       } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong."); setStep("error"); }
       return;
     }
@@ -155,8 +167,22 @@ export default function Home() {
       const r2 = await fetch("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scraped }) });
       const d2 = await r2.json();
       if (!r2.ok) throw new Error(d2.error || "Redesign failed");
-      setPreview({ html: d2.html || d2.previewHtml || "", businessName: d2.businessName || scraped.businessName || "Your Business", sourceUrl: clean });
+      const pv2 = { html: d2.html || d2.previewHtml || "", businessName: d2.businessName || scraped.businessName || "Your Business", sourceUrl: clean };
+      setPreview(pv2);
       setStep("preview");
+      // Save to user's account if logged in
+      try {
+        const sb = getSupabaseClient();
+        const { data: { session } } = await sb.auth.getSession();
+        if (session?.user) {
+          const projectId = `proj_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+          const existing = JSON.parse(localStorage.getItem(`sc_projects_${session.user.id}`) || "[]");
+          existing.unshift({ id: projectId, businessName: pv2.businessName, sourceUrl: pv2.sourceUrl, createdAt: new Date().toISOString() });
+          localStorage.setItem(`sc_projects_${session.user.id}`, JSON.stringify(existing.slice(0,50)));
+          // Also store full html for this project
+          sessionStorage.setItem(`sc_html_${projectId}`, pv2.html);
+        }
+      } catch { /* non-blocking */ }
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong."); setStep("error"); }
   }, [url]);
 
@@ -555,3 +581,4 @@ export default function Home() {
     </div>
   );
 }
+
