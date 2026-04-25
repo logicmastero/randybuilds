@@ -175,11 +175,11 @@ function detectVertical(data: ScrapedInput): VerticalProfile {
 async function callClaude(
   client: Anthropic,
   data: ScrapedInput,
-  vertical: VerticalProfile,
+  const hasServices = (Array.isArray(data.services) ? data.services : []).filter(s => typeof s === "string" && s.length > 3).length > 0;
 ): Promise<RedesignCopy> {
-  const hasServices = data.services.filter(s => s.length > 3).length > 0;
-  const servicesText = hasServices
-    ? data.services.filter(s => s.length > 3).join(", ")
+    (Array.isArray(data.services) ? data.services : []).filter(s => typeof s === "string" && s.length > 3).join(", ")
+    (Array.isArray(data.services) ? data.services : []).filter(s => typeof s === "string" && s.length > 3).join(", ")
+    ? (Array.isArray(data.services) ? data.services : []).filter(s => typeof s === "string" && s.length > 3).join(", ")
     : "Not found on page — infer from business type and description";
 
   const systemPrompt = `You are a world-class ${vertical.systemPersona}. You write copy that is sharp, specific, and converts. You never use generic filler phrases. You understand that ${vertical.label} businesses have a specific audience with specific needs, and you write directly to that audience's outcome.
@@ -219,7 +219,7 @@ Return ONLY this JSON structure (no markdown, no wrapper):
   "closingHeadline": "5-8 word closing headline that makes the target user want to act"
 }
 
-Write exactly ${Math.max(data.services.filter(s => s.length > 3).length, 3)} service objects. If fewer than 3 services were found, invent the most likely core features/offerings for a ${vertical.label}.`;
+Write exactly ${Math.max((Array.isArray(data.services) ? data.services : []).filter(s => typeof s === "string" && s.length > 3).length, 3)} service objects. If fewer than 3 services were found, invent the most likely core features/offerings for a ${vertical.label}.`;
 
   const message = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
@@ -260,7 +260,7 @@ async function generateRedesignCopy(
   }
 
   const vertical = detectVertical(data);
-  console.log(`[redesign] Vertical: "${vertical.label}" | ${data.businessName} | desc:${data.description.length}c headline:"${data.headline.slice(0,50)}" services:${data.services.length}`);
+  console.log(`[redesign] Vertical: "${vertical.label}" | ${data.businessName} | desc:${data.description.length}c headline:"${data.headline.slice(0,50)}" services:${Array.isArray(data.services) ? data.services.length : 0}`);
   console.log(`[redesign] Key: present=${!!apiKey} len=${apiKey.length} prefix=${apiKey.slice(0,20)}`);
 
   const client = new Anthropic({ apiKey });
@@ -306,7 +306,7 @@ async function generateRedesignCopy(
 
 function buildFallbackCopy(data: ScrapedInput, vertical?: VerticalProfile): RedesignCopy {
   const v = vertical || detectVertical(data);
-  const services = data.services.filter(s => s.length > 3);
+  const services = (Array.isArray(data.services) ? data.services : []).filter(s => typeof s === "string" && s.length > 3);
   const serviceItems = services.length > 0
     ? services.map((s, i) => ({
         title: s,
