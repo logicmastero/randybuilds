@@ -1142,6 +1142,27 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const data: ScrapedInput = body.scraped ?? body;
+    
+    // VALIDATION: Normalize all required fields
+    if (typeof data.services === 'string') {
+      data.services = [data.services];
+    }
+    if (!Array.isArray(data.services)) {
+      data.services = [];
+    }
+    data.services = data.services.filter((s: any) => typeof s === 'string').slice(0, 6);
+    
+    // Ensure colors is always an array
+    if (!Array.isArray(data.colors)) {
+      data.colors = ['#1a1a2e', '#e94560'];
+    }
+    data.colors = data.colors.filter((c: any) => typeof c === 'string').slice(0, 8);
+    
+    // Ensure images is always an array
+    if (!Array.isArray(data.images)) {
+      data.images = [];
+    }
+    data.images = data.images.filter((i: any) => typeof i === 'string').slice(0, 12);
 
     // Allow description-only mode: populate missing fields from description
     if (body.input && !data.description) {
