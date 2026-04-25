@@ -2,22 +2,29 @@
  * db.ts
  * Neon serverless Postgres client for RandyBuilds.
  * Uses @neondatabase/serverless — works in Vercel Edge + Node serverless.
+ * Lazy-initialised so it doesn't blow up during build when env vars aren't present.
  */
 
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
+let _sql: NeonQueryFunction<false, false> | null = null;
+
+export function getDb(): NeonQueryFunction<false, false> {
+  if (_sql) return _sql;
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL environment variable is not set");
+  _sql = neon(url);
+  return _sql;
 }
-
-export const sql = neon(process.env.DATABASE_URL);
 
 /**
  * Initialize database tables if they don't exist.
- * Call this from a setup route or on first deploy.
+ * Call this from /api/init-db on first deploy.
  */
 export async function initDb() {
-  await sql`
+  const db = getDb();
+
+  await db`
     CREATE TABLE IF NOT EXISTS users (
       id          TEXT PRIMARY KEY,
       email       TEXT UNIQUE NOT NULL,
@@ -27,7 +34,7 @@ export async function initDb() {
     )
   `;
 
-  await sql`
+  await db`
     CREATE TABLE IF NOT EXISTS saved_sites (
       id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
       user_id       TEXT REFERENCES users(id) ON DELETE CASCADE,
@@ -40,7 +47,7 @@ export async function initDb() {
     )
   `;
 
-  await sql`
+  await db`
     CREATE TABLE IF NOT EXISTS leads (
       id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
       business_name TEXT NOT NULL,
