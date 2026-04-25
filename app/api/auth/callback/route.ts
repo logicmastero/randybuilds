@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import {
+  exchangeGoogleCode,
+  getGoogleUserInfo,
+  signSession,
+  sessionCookieOptions,
+} from "../../../../lib/auth";
 import { upsertUser } from "../../../../lib/db";
 
 export const dynamic = "force-dynamic";
@@ -7,54 +12,72 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const state = searchParams.get("state");
+  const errorParam = searchParams.get("error");
+
+  if (errorParam) {
+    console.error("[auth/callback] Google returned error:", errorParam);
+    return NextResponse.redirect(`${origin}/login?error=google_denied`);
+  }
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=no_code`);
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const redirectUri = `${origin}/api/auth/callback`;
 
-  if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("placeholder")) {
-    return NextResponse.redirect(`${origin}/login?error=not_configured`);
-  }
-
-  const redirectTo = next.startsWith("/") ? `${origin}${next}` : `${origin}/dashboard`;
-  const res = NextResponse.redirect(redirectTo);
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return req.cookies.getAll();
-      },
-      setAll(cookiesToSet: Array<{ name: string; value: string; options: Record<string, unknown> }>) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          res.cookies.set(name, value, options as Parameters<typeof res.cookies.set>[2]);
-        });
-      },
-    },
-  });
-
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error || !data.session) {
-    console.error("[auth/callback] Exchange failed:", error?.message);
+  // Exchange code for tokens
+  const tokens = await exchangeGoogleCode(code, redirectUri);
+  if (!tokens?.access_token) {
+    console.error("[auth/callback] Token exchange failed");
     return NextResponse.redirect(`${origin}/login?error=auth_failed`);
   }
 
-  // Sync user to Neon (fire-and-forget, don't block redirect)
-  const user = data.user;
-  if (user?.id && user?.email) {
-    upsertUser({
-      id: user.id,
-      email: user.email,
-      name: user.user_metadata?.full_name || user.user_metadata?.name || undefined,
-      avatar_url: user.user_metadata?.avatar_url || undefined,
-      provider: "google",
-    }).catch((e: unknown) => {
-      console.error("[auth/callback] Neon sync failed:", e instanceof Error ? e.message : String(e));
-    });
+  // Get user info
+  const googleUser = await getGoogleUserInfo(tokens.access_token);
+  if (!googleUser?.email) {
+    return NextResponse.redirect(`${origin}/login?error=no_user_info`);
   }
+
+  // Upsert to Neon DB
+  const userId = `google_${googleUser.sub}`;
+  try {
+    await upsertUser({
+      id: userId,
+      email: googleUser.email,
+      name: googleUser.name,
+      avatar_url: googleUser.picture,
+      provider: "google",
+    });
+  } catch (e) {
+    console.error("[auth/callback] Neon upsert failed:", e);
+    // Non-fatal — continue with login
+  }
+
+  // Sign JWT session
+  const sessionToken = await signSession({
+    id: userId,
+    email: googleUser.email,
+    name: googleUser.name,
+    avatar_url: googleUser.picture,
+  });
+
+  // Decode state to get redirect path
+  let next = "/dashboard";
+  if (state) {
+    try { next = decodeURIComponent(state); } catch {}
+    if (!next.startsWith("/")) next = "/dashboard";
+  }
+
+  const res = NextResponse.redirect(`${origin}${next}`);
+  const cookieOpts = sessionCookieOptions(sessionToken);
+  res.cookies.set(cookieOpts.name, cookieOpts.value, {
+    httpOnly: cookieOpts.httpOnly,
+    secure: cookieOpts.secure,
+    sameSite: cookieOpts.sameSite,
+    maxAge: cookieOpts.maxAge,
+    path: cookieOpts.path,
+  });
 
   return res;
 }

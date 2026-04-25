@@ -1,40 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { getSessionFromRequest } from "./lib/auth";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-function isConfigured() {
-  return supabaseUrl && !supabaseUrl.includes("placeholder")
-    && supabaseAnonKey && !supabaseAnonKey.includes("placeholder");
-}
+export const config = {
+  matcher: ["/dashboard/:path*", "/api/crm/:path*", "/api/projects/:path*"],
+};
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  if (!pathname.startsWith("/dashboard")) return NextResponse.next();
-  if (!isConfigured()) return NextResponse.next();
+  const user = await getSessionFromRequest(req);
 
-  let res = NextResponse.next({ request: req });
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() { return req.cookies.getAll(); },
-      setAll(cookiesToSet: Array<{name:string; value:string; options:Record<string,unknown>}>) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          req.cookies.set(name, value);
-          res.cookies.set(name, value, options as Parameters<typeof res.cookies.set>[2]);
-        });
-      },
-    },
-  });
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+  // Protect dashboard pages
+  if (req.nextUrl.pathname.startsWith("/dashboard")) {
+    if (!user) {
+      const loginUrl = new URL("/login", req.url);
+      loginUrl.searchParams.set("next", req.nextUrl.pathname);
+      return NextResponse.redirect(loginUrl);
+    }
   }
-  return res;
-}
 
-export const config = { matcher: ["/dashboard/:path*"] };
+  // Protect CRM and projects API routes
+  if (
+    req.nextUrl.pathname.startsWith("/api/crm") ||
+    req.nextUrl.pathname.startsWith("/api/projects")
+  ) {
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+  }
+
+  return NextResponse.next();
+}

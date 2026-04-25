@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { getSupabaseClient } from "../../lib/supabase";
+
 
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Instrument+Serif:ital@0;1&display=swap');
@@ -214,12 +214,10 @@ export default function PricingPage() {
   };
 
   useEffect(() => {
-    try {
-      const sb = getSupabaseClient();
-      sb.auth.getSession().then(({ data: { session } }) => {
-        if (session) setIsLoggedIn(true);
-      });
-    } catch { /* no supabase */ }
+    fetch("/api/auth/me")
+      .then(r => r.ok ? r.json() : null)
+      .then(user => { if (user?.email) setIsLoggedIn(true); })
+      .catch(() => {});
   }, []);
 
   return (

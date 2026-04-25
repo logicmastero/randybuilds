@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getSupabaseClient } from "../lib/supabase";
+
 
 const PHRASES = [
   "converts visitors into customers.",
@@ -70,16 +70,16 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInitial, setUserInitial] = useState("");
   useEffect(() => {
-    try {
-      const sb = getSupabaseClient();
-      sb.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
+    fetch("/api/auth/me")
+      .then(r => r.ok ? r.json() : null)
+      .then(user => {
+        if (user?.email) {
           setIsLoggedIn(true);
-          const name = session.user.user_metadata?.full_name || session.user.email || "?";
+          const name = user.name || user.email || "?";
           setUserInitial(name[0].toUpperCase());
         }
-      });
-    } catch { /* supabase not configured */ }
+      })
+      .catch(() => {});
   }, []);
   const [url, setUrl] = useState("");
   const [step, setStep] = useState<Step>("input");
@@ -139,13 +139,15 @@ export default function Home() {
         setStep("preview");
         // Save to user's account if logged in
         try {
-          const sb = getSupabaseClient();
-          const { data: { session } } = await sb.auth.getSession();
-          if (session?.user) {
-            const projectId = `proj_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
-            const existing = JSON.parse(localStorage.getItem(`sc_projects_${session.user.id}`) || "[]");
-            existing.unshift({ id: projectId, businessName: pv.businessName, sourceUrl: pv.sourceUrl, createdAt: new Date().toISOString() });
-            localStorage.setItem(`sc_projects_${session.user.id}`, JSON.stringify(existing.slice(0,50)));
+          const meRes = await fetch("/api/auth/me");
+          if (meRes.ok) {
+            const user = await meRes.json();
+            if (user?.id) {
+              const projectId = `proj_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+              const existing = JSON.parse(localStorage.getItem(`sc_projects_${user.id}`) || "[]");
+              existing.unshift({ id: projectId, businessName: pv.businessName, sourceUrl: pv.sourceUrl, createdAt: new Date().toISOString() });
+              localStorage.setItem(`sc_projects_${user.id}`, JSON.stringify(existing.slice(0, 50)));
+            }
           }
         } catch { /* non-blocking */ }
       } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong."); setStep("error"); }
@@ -172,15 +174,16 @@ export default function Home() {
       setStep("preview");
       // Save to user's account if logged in
       try {
-        const sb = getSupabaseClient();
-        const { data: { session } } = await sb.auth.getSession();
-        if (session?.user) {
-          const projectId = `proj_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
-          const existing = JSON.parse(localStorage.getItem(`sc_projects_${session.user.id}`) || "[]");
-          existing.unshift({ id: projectId, businessName: pv2.businessName, sourceUrl: pv2.sourceUrl, createdAt: new Date().toISOString() });
-          localStorage.setItem(`sc_projects_${session.user.id}`, JSON.stringify(existing.slice(0,50)));
-          // Also store full html for this project
-          sessionStorage.setItem(`sc_html_${projectId}`, pv2.html);
+        const meRes2 = await fetch("/api/auth/me");
+        if (meRes2.ok) {
+          const user2 = await meRes2.json();
+          if (user2?.id) {
+            const projectId = `proj_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+            const existing = JSON.parse(localStorage.getItem(`sc_projects_${user2.id}`) || "[]");
+            existing.unshift({ id: projectId, businessName: pv2.businessName, sourceUrl: pv2.sourceUrl, createdAt: new Date().toISOString() });
+            localStorage.setItem(`sc_projects_${user2.id}`, JSON.stringify(existing.slice(0, 50)));
+            sessionStorage.setItem(`sc_html_${projectId}`, pv2.html);
+          }
         }
       } catch { /* non-blocking */ }
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong."); setStep("error"); }
