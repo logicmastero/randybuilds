@@ -496,6 +496,7 @@ export default function Home() {
               <a href="#how" className="nav-link">How it works</a>
               <a href="/pricing" className="nav-link">Pricing</a>
               <a href="/gallery" className="nav-link">Gallery</a>
+              <a href="/forge" className="nav-link" style={{fontWeight:700, color:"#c8a96e"}}>⚡ Forge Agent</a>
               <a href="mailto:hello@sitecraftai.com" className="nav-link">Contact</a>
             </div>
             {isLoggedIn ? (
@@ -642,6 +643,7 @@ export default function Home() {
               <a href="#how" className="f-link">How it works</a>
               <a href="#pricing" className="f-link">Pricing</a>
               <a href="/gallery" className="f-link">Gallery</a>
+              <a href="/forge" className="f-link">Forge Agent ⚡</a>
               <a href="mailto:hello@sitecraftai.com" className="f-link">Contact</a>
             </div>
             <div className="f-copy">© 2026 Sitecraft · Alberta, Canada · AI-Powered</div>

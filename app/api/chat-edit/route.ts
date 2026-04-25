@@ -20,7 +20,8 @@ interface ChatEditRequest {
   stream?: boolean;
 }
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const apiKey = process.env.ANTHROPIC_API_KEY_NEW ?? process.env.ANTHROPIC_API_KEY;
+const client = new Anthropic({ apiKey });
 
 const SYSTEM_PROMPT = `You are Randy — an expert AI website builder embedded in Sitecraft, a live AI website editor.
 

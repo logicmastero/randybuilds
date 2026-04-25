@@ -83,7 +83,6 @@ export default function BuilderPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showShareToast, setShowShareToast] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
