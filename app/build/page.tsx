@@ -46,6 +46,17 @@ const QUICK_PROMPTS: Array<{ label: string; prompt: string }> = [
   { label: "Remove clutter",   prompt: "Make the design more minimal — remove decorative elements and simplify layout" },
 ];
 
+const COLOR_PALETTES: Array<{ label: string; color: string; prompt: string }> = [
+  { label: "Gold",    color: "#c8a96e", prompt: "Change the accent color to gold (#c8a96e) — update buttons, highlights, and accents throughout" },
+  { label: "Blue",    color: "#3b82f6", prompt: "Change the accent color to electric blue (#3b82f6) throughout the site" },
+  { label: "Green",   color: "#4ade80", prompt: "Change the accent color to emerald green (#4ade80) throughout the site" },
+  { label: "Red",     color: "#ef4444", prompt: "Change the accent color to bold red (#ef4444) throughout the site" },
+  { label: "Purple",  color: "#a855f7", prompt: "Change the accent color to purple (#a855f7) throughout the site" },
+  { label: "Teal",    color: "#14b8a6", prompt: "Change the accent color to teal (#14b8a6) throughout the site" },
+  { label: "Orange",  color: "#f97316", prompt: "Change the accent color to vibrant orange (#f97316) throughout the site" },
+  { label: "White",   color: "#ffffff", prompt: "Switch to a clean white/light color scheme — light background, dark text" },
+];
+
 export default function BuilderPage() {
   const [state, setState] = useState<BuildState>({
     html: "", businessName: "", sourceUrl: "", history: [], isLoading: true,
