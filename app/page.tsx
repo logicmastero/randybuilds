@@ -350,6 +350,74 @@ export default function Home() {
     /* RESPONSIVE */
     @media(max-width:768px){
       .nav{padding:16px 20px}
+    @media(max-width:640px){
+      .hero-h1{font-size:clamp(36px,6vw,60px);margin-bottom:20px}
+      .hero-sub{font-size:15px;margin-bottom:36px}
+      .hero-form{flex-direction:column;gap:8px;padding:12px}
+      .hero-input{padding:8px}
+      .hero-btn{width:100%;justify-content:center;padding:14px 20px;font-size:13px}
+      .nav-logo{font-size:16px}
+      .sec-h2{font-size:clamp(28px,5vw,44px);margin-bottom:12px}
+      .sec-sub{font-size:14px;max-width:100%}
+      .sp-row{flex-direction:column;align-items:flex-start;gap:12px}
+      .sp-avs{margin-bottom:8px}
+      .hero-hint{font-size:11px;margin-top:10px}
+    }
+    @media(max-width:480px){
+      html,body{font-size:14px}
+      :root{--r:12px;--r-lg:16px}
+      .nav{padding:12px 16px;height:56px}
+      .nav-logo{font-size:14px}
+      .nav-cta{padding:8px 16px;font-size:12px}
+      .hero{padding:80px 16px 50px;gap:20px}
+      .hero-badge{font-size:10px;padding:5px 12px 5px 6px}
+      .hero-h1{font-size:clamp(28px,5vw,40px);line-height:1.1;margin-bottom:16px}
+      .hero-sub{font-size:13px;margin-bottom:28px;max-width:100%}
+      .hero-form{flex-direction:column}
+      .hero-input{font-size:14px;padding:10px}
+      .hero-btn{width:100%;padding:12px 18px;font-size:13px}
+      .form-wrap{max-width:100%}
+      .hero-hint{font-size:10px;margin-top:8px}
+      .section{padding:60px 16px}
+      .sec-h2{font-size:clamp(24px,5vw,36px)}
+      .sec-label{font-size:10px}
+      .sec-sub{font-size:13px}
+      .steps{gap:1px}
+      .step{padding:28px 20px}
+      .step-icon{width:40px;height:40px;font-size:18px;margin-bottom:16px}
+      .step-title{font-size:15px;margin-bottom:8px}
+      .step-desc{font-size:13px}
+      .stat{padding:32px 20px}
+      .stat-num{font-size:26px}
+      .stat-label{font-size:11px}
+      .pricing{grid-template-columns:1fr;gap:12px}
+      .price-card{padding:28px 20px}
+      .price-name{font-size:16px;margin-bottom:8px}
+      .price-num{font-size:24px}
+      .price-fee{font-size:11px}
+      .price-feat{font-size:12px;padding:8px 0}
+      .price-cta{padding:10px 18px;font-size:12px;width:100%}
+      .testi{grid-template-columns:1fr}
+      .testi-card{padding:28px 20px}
+      .testi-quote{font-size:13px;line-height:1.6;margin-bottom:12px}
+      .testi-author{font-size:12px}
+      .testi-role{font-size:11px}
+      .cta-sec{margin:0;padding:40px 20px;border-radius:12px}
+      .cta-h{font-size:clamp(24px,5vw,32px);margin-bottom:12px}
+      .cta-sub{font-size:13px;margin-bottom:24px}
+      .cta-btns{flex-direction:column;gap:10px}
+      .cta-btn{width:100%;padding:12px 18px;font-size:13px}
+      .footer{padding:28px 16px;gap:20px;text-align:center}
+      .f-col{margin-bottom:20px}
+      .f-title{font-size:13px;margin-bottom:12px}
+      .f-link{font-size:12px}
+      .f-copy{font-size:11px}
+      /* Touch targets - min 48x48px tap area */
+      button,a[role="button"]{min-height:44px;padding:10px 16px}
+      .nav-cta{min-width:44px;min-height:44px}
+      .hero-btn{min-height:44px}
+    }
+    
       .nav-links{display:none}
       .hero{padding:100px 20px 60px}
       .section{padding:72px 20px}
