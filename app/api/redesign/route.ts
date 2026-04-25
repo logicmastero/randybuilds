@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { savePreview, isRedisConfigured } from "../../../lib/preview-store";
+import { savePreviewSession, logGeneration } from "../../../lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 
 export const maxDuration = 45;
@@ -1194,6 +1195,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[redesign] Saving preview slug="${slug}" source="${source}" redis=${isRedisConfigured()}`);
 
+    // Persist to Redis (fast, in-memory fallback)
     await savePreview(slug, {
       html,
       businessName: data.businessName,
@@ -1201,6 +1203,27 @@ export async function POST(req: NextRequest) {
       source,
       createdAt: Date.now(),
     });
+
+    // Persist to Neon Postgres (durable, cross-instance)
+    const generationStart = (globalThis as Record<string, unknown>)._genStart as number | undefined;
+    const generationMs = generationStart ? Date.now() - generationStart : undefined;
+
+    savePreviewSession({
+      slug,
+      business_name: data.businessName,
+      html,
+      input_url: data.url || undefined,
+      source,
+      generation_ms: generationMs,
+    }).catch((e: unknown) => console.error("[redesign] Neon save error:", e));
+
+    // Log generation for analytics
+    logGeneration({
+      input_type: data.url ? "url" : "description",
+      input_value: data.url || data.description?.slice(0, 200) || undefined,
+      duration_ms: generationMs,
+      success: true,
+    }).catch((e: unknown) => console.error("[redesign] Log error:", e));
 
     return NextResponse.json({
       previewUrl: `/preview/${slug}`,

@@ -1,4 +1,5 @@
 import { getPreview, isRedisConfigured } from "../../../lib/preview-store";
+import { getPreviewSession } from "../../../lib/db";
 import { notFound } from "next/navigation";
 
 export const dynamic   = "force-dynamic";
@@ -26,7 +27,13 @@ export async function generateMetadata({ params }: Props) {
 export default async function PreviewPage({ params }: Props) {
   const { slug } = await params;
 
-  const shareable = process.env.SHAREABLE_LINKS_ENABLED === "true" || isRedisConfigured();
+  // Try Redis first (fast), then Neon (durable fallback)
+  let neonPreview = null;
+  try {
+    neonPreview = await getPreviewSession(slug);
+  } catch (_e) {}
+
+  const shareable = process.env.SHAREABLE_LINKS_ENABLED === "true" || isRedisConfigured() || !!neonPreview;
 
   if (!shareable) {
     return (
