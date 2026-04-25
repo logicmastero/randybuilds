@@ -46,6 +46,14 @@ const QUICK_PROMPTS: Array<{ label: string; prompt: string }> = [
   { label: "Remove clutter",   prompt: "Make the design more minimal — remove decorative elements and simplify layout" },
 ];
 
+const FONT_STACKS: Array<{ label: string; heading: string; body: string; prompt: string }> = [
+  { label: "Modern", heading: "'Instrument Serif', serif", body: "'Inter', system-ui, sans-serif", prompt: "Update typography to use Instrument Serif for headings and Inter for body text" },
+  { label: "Classic", heading: "'Georgia', serif", body: "'system-ui', sans-serif", prompt: "Change to classic serif/sans-serif — Georgia headings, system-ui body" },
+  { label: "Bold", heading: "'Courier New', monospace", body: "'system-ui', sans-serif", prompt: "Make typography bolder — monospace headings, modern sans-serif body" },
+  { label: "Clean", heading: "'Trebuchet MS', sans-serif", body: "'Verdana', sans-serif", prompt: "Switch to clean web-safe fonts throughout" },
+  { label: "Elegant", heading: "'Palatino', serif", body: "'Garamond', serif", prompt: "Use elegant serif fonts throughout — Palatino and Garamond" },
+];
+
 const COLOR_PALETTES: Array<{ label: string; color: string; prompt: string }> = [
   { label: "Gold",    color: "#c8a96e", prompt: "Change the accent color to gold (#c8a96e) — update buttons, highlights, and accents throughout" },
   { label: "Blue",    color: "#3b82f6", prompt: "Change the accent color to electric blue (#3b82f6) throughout the site" },
@@ -57,16 +65,6 @@ const COLOR_PALETTES: Array<{ label: string; color: string; prompt: string }> = 
   { label: "White",   color: "#ffffff", prompt: "Switch to a clean white/light color scheme — light background, dark text" },
 ];
 
-const FONT_STACKS: Array<{ label: string; prompt: string }> = [
-  { label: "Modern",    prompt: "Use modern fonts: Inter for body, Instrument Serif for headings. Make it clean and professional." },
-  { label: "Classic",   prompt: "Use classic fonts: Georgia or Times New Roman for body, Garamond for headings. Make it elegant." },
-  { label: "Bold",      prompt: "Use bold fonts: Montserrat for body, Playfair Display for headings. Make it striking and modern." },
-  { label: "Minimal",   prompt: "Use minimal fonts: system fonts (helvetica, arial) throughout. Keep it super clean and fast-loading." },
-  { label: "Friendly",  prompt: "Use friendly fonts: Poppins for both body and headings. Make it approachable and warm." },
-  { label: "Corporate", prompt: "Use corporate fonts: Open Sans for body, Lato for headings. Make it professional and trustworthy." },
-  { label: "Serif",     prompt: "Use serif fonts: all serif — Lora for body, PT Serif for headings. Make it timeless." },
-  { label: "Sans Bold", prompt: "Use bold sans fonts: Roboto for body, IBM Plex Sans Bold for headings. Make it strong and modern." },
-];
 
 export default function BuilderPage() {
   const [state, setState] = useState<BuildState>({
@@ -81,6 +79,7 @@ export default function BuilderPage() {
   const [showSections, setShowSections] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [chatWidth, setChatWidth] = useState(360);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showShareToast, setShowShareToast] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
