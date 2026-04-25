@@ -84,6 +84,7 @@ export default function BuilderPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showShareToast, setShowShareToast] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
@@ -384,6 +385,7 @@ export default function BuilderPage() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); handleUndo(); }
       if ((e.metaKey || e.ctrlKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); handleRedo(); }
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) { e.preventDefault(); setShowShortcuts(true); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -914,6 +916,47 @@ export default function BuilderPage() {
           )}
         </div>
       </div>
+
+      {/* ─── SHORTCUTS MODAL ──────────────────────────────────────────────────── */}
+      {showShortcuts && (
+        <>
+          <div className="overlay-close" onClick={()=>setShowShortcuts(false)} />
+          <div className="overlay-panel">
+            <div style={{
+              background:"#131310", border:"1px solid rgba(200,169,110,0.2)", borderRadius:16,
+              width:"100%", maxWidth:420, padding:28, position:"relative",
+            }}>
+              <button onClick={()=>setShowShortcuts(false)} style={{
+                position:"absolute", top:16, right:16, background:"transparent",
+                border:"none", color:"rgba(232,224,208,0.35)", fontSize:18, cursor:"pointer", lineHeight:1,
+              }}>×</button>
+              <div style={{ fontSize:12, fontWeight:700, color:"#c8a96e", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:16 }}>Keyboard Shortcuts</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                {[
+                  { keys: "Ctrl+Z / Cmd+Z", action: "Undo" },
+                  { keys: "Ctrl+Y / Cmd+Y", action: "Redo" },
+                  { keys: "?", action: "Show this" },
+                  { keys: "Enter", action: "Send message" },
+                  { keys: "Shift+Enter", action: "New line" },
+                  { keys: "Cmd+Click", action: "Edit image" },
+                  { keys: "Right-click img", action: "Change image" },
+                  { keys: "Hover section", action: "Drag to reorder" },
+                ].map((s, i) => (
+                  <div key={i} style={{ fontSize:11 }}>
+                    <div style={{ color:"#c8a96e", fontWeight:700, marginBottom:3 }}>{s.keys}</div>
+                    <div style={{ color:"rgba(232,224,208,0.5)" }}>{s.action}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop:20, padding:"12px 16px", background:"rgba(200,169,110,0.06)", border:"1px solid rgba(200,169,110,0.15)", borderRadius:10 }}>
+                <div style={{ fontSize:11, color:"rgba(232,224,208,0.6)", lineHeight:1.6 }}>
+                  <strong>Pro tips:</strong> Click color circles to change brand color. Click fonts to switch typography. Drag section corners to reorder. Click sections to edit them.
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ─── HISTORY MODAL ────────────────────────────────────────────────────── */}
       {showHistory && (
