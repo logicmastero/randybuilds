@@ -426,7 +426,7 @@ export default function Home() {
             <a href="/" className="nav-logo">Site<span>craft</span></a>
             <div className="nav-links">
               <a href="#how" className="nav-link">How it works</a>
-              <a href="#pricing" className="nav-link">Pricing</a>
+              <a href="/pricing" className="nav-link">Pricing</a>
               <a href="mailto:hello@sitecraftai.com" className="nav-link">Contact</a>
             </div>
             {isLoggedIn ? (
