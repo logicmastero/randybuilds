@@ -1,0 +1,19 @@
+{
+  "name": "Sitecraft — AI Website Builder",
+  "short_name": "Sitecraft",
+  "description": "Premium AI-generated websites in 60 seconds",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b09",
+  "theme_color": "#0b0b09",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["business", "utilities"],
+  "lang": "en-CA"
+}

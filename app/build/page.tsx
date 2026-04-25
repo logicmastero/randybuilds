@@ -496,7 +496,15 @@ export default function BuilderPage() {
                   </div>
                   <div style={{ fontSize: 12, color: "rgba(232,224,208,0.5)" }}>yourbusiness.randybuilds.site + SSL + CDN</div>
                 </div>
-                <button onClick={() => window.open("https://buy.stripe.com/placeholder", "_blank")} style={{
+                <button onClick={async () => {
+                  const res = await fetch("/api/stripe/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ plan: "retainer", businessName: state.businessName }),
+                  });
+                  const d = await res.json();
+                  if (d.url) window.location.href = d.url;
+                }} style={{
                   background: "linear-gradient(135deg,#c8a96e,#a07840)",
                   border: "none", borderRadius: 8, padding: "8px 16px",
                   color: "#0a0a08", fontWeight: 800, fontSize: 13, cursor: "pointer",
@@ -512,7 +520,15 @@ export default function BuilderPage() {
                   </div>
                   <div style={{ fontSize: 12, color: "rgba(232,224,208,0.5)" }}>yourname.com + SSL + hosting + support</div>
                 </div>
-                <button onClick={() => window.open("https://buy.stripe.com/placeholder", "_blank")} style={{
+                <button onClick={async () => {
+                  const res = await fetch("/api/stripe/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ plan: "standard", businessName: state.businessName }),
+                  });
+                  const d = await res.json();
+                  if (d.url) window.location.href = d.url;
+                }} style={{
                   background: "#1f1f18", border: "1px solid #333",
                   borderRadius: 8, padding: "8px 16px",
                   color: "#e8e0d0", fontWeight: 700, fontSize: 13, cursor: "pointer",

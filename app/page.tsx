@@ -495,6 +495,7 @@ export default function Home() {
             <div className="nav-links">
               <a href="#how" className="nav-link">How it works</a>
               <a href="/pricing" className="nav-link">Pricing</a>
+              <a href="/gallery" className="nav-link">Gallery</a>
               <a href="mailto:hello@sitecraftai.com" className="nav-link">Contact</a>
             </div>
             {isLoggedIn ? (
@@ -640,6 +641,7 @@ export default function Home() {
             <div className="f-links">
               <a href="#how" className="f-link">How it works</a>
               <a href="#pricing" className="f-link">Pricing</a>
+              <a href="/gallery" className="f-link">Gallery</a>
               <a href="mailto:hello@sitecraftai.com" className="f-link">Contact</a>
             </div>
             <div className="f-copy">© 2026 Sitecraft · Alberta, Canada · AI-Powered</div>

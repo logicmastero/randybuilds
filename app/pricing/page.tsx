@@ -191,6 +191,27 @@ export default function PricingPage() {
   const [annual, setAnnual] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  const [checkoutErr, setCheckoutErr] = useState<string | null>(null);
+
+  const handleCheckout = async (planKey: string) => {
+    setCheckingOut(planKey);
+    setCheckoutErr(null);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed");
+      if (data.url) window.location.href = data.url;
+    } catch (e: unknown) {
+      setCheckoutErr(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setCheckingOut(null);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -255,16 +276,23 @@ export default function PricingPage() {
                     </li>
                   ))}
                 </ul>
-                <a
-                  href={isLoggedIn ? "/" : "/login"}
+                <button
                   className={`plan-btn${plan.gold ? " gold" : ""}`}
+                  onClick={() => handleCheckout(plan.tier.toLowerCase())}
+                  disabled={checkingOut === plan.tier.toLowerCase()}
                 >
-                  {plan.cta}
-                </a>
+                  {checkingOut === plan.tier.toLowerCase() ? "Redirecting…" : plan.cta}
+                </button>
               </div>
             );
           })}
         </div>
+
+        {checkoutErr && (
+          <div style={{background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.25)",borderRadius:12,padding:"14px 20px",fontSize:13,color:"#ff6060",marginBottom:20}}>
+            {checkoutErr}
+          </div>
+        )}
 
         {/* COMPARISON TABLE */}
         <div className="compare">
@@ -312,7 +340,7 @@ export default function PricingPage() {
         <div className="cta-band">
           <div className="cta-band-h">See your site before you spend <em>a single dollar.</em></div>
           <div className="cta-band-sub">Generate a free preview in 60 seconds — no login, no card, no commitment.<br />You'll know immediately if this is for you.</div>
-          <a href="/" className="btn-gold">Build my site free →</a>
+          <a href="/login" className="btn-gold">Build my site free →</a>
         </div>
       </div>
     </div>
