@@ -1120,7 +1120,8 @@ ${img0 ? `
 </script>
 
 </body>
-</html>
+</html>`;
+}
 
 function generateSlug(businessName: string): string {
   // 8-char base62 from timestamp + random — short enough to text, unique enough to not collide
