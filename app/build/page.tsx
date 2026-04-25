@@ -601,6 +601,24 @@ export default function BuilderPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleCopyHtml = async () => {
+    try {
+      await navigator.clipboard.writeText(state.html);
+      setShowShareToast(true);
+      setTimeout(() => setShowShareToast(false), 2000);
+    } catch {
+      // Fallback
+      const textarea = document.createElement("textarea");
+      textarea.value = state.html;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setShowShareToast(true);
+      setTimeout(() => setShowShareToast(false), 2000);
+    }
+  };
+
   const deviceDims: Record<string, { width: string }> = {
     desktop: { width: "100%" },
     tablet:  { width: "768px" },
@@ -701,7 +719,8 @@ export default function BuilderPage() {
           <button className="icon-btn" onClick={()=>setShowHistory(true)} disabled={!undoStack.length} style={{ fontSize:11 }} title={`${undoStack.length} edits`}>⏱ History</button>
           <button className="icon-btn" onClick={handleRedo} disabled={!redoStack.length} title="Redo (Ctrl+Y)">↪ Redo</button>
           <button className="icon-btn" onClick={handleShare} title="Copy shareable link">⎘ Share</button>
-          <button className="icon-btn" onClick={handleDownload}>↓ HTML</button>
+          <button className="icon-btn" onClick={handleCopyHtml} title="Copy HTML to clipboard">⎘ HTML</button>
+          <button className="icon-btn" onClick={handleDownload}>↓ Download</button>
           <button
             className="icon-btn"
             onClick={handleSaveToAccount}
@@ -1021,7 +1040,7 @@ export default function BuilderPage() {
           zIndex:1000, backdropFilter:"blur(16px)", boxShadow:"0 8px 32px rgba(0,0,0,0.5)",
           animation:"fadeUp 0.2s ease forwards",
         }}>
-          <span>✓ Link copied to clipboard</span>
+          <span>✓ {shareUrl ? "Link" : "HTML"} copied to clipboard</span>
           {shareUrl && (
             <a href={shareUrl} target="_blank" rel="noreferrer" style={{ color:"rgba(200,169,110,0.6)", fontSize:11, textDecoration:"none" }}>
               open →
