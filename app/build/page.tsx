@@ -157,6 +157,37 @@ export default function BuilderPage() {
               var dragStartY = 0;
 
               // ─ Add drag handles to all sections
+              // ─ Add right-click menu to images
+              function addImageListeners() {
+                var images = document.querySelectorAll('img');
+                images.forEach(function(img) {
+                  if (img.__rb_click_added) return;
+                  img.__rb_click_added = true;
+                  img.style.cursor = 'pointer';
+                  img.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    var alt = img.alt || img.src;
+                    var tooltip = document.createElement('div');
+                    tooltip.style.cssText = 'position:fixed;top:' + (e.clientY + 10) + 'px;left:' + (e.clientX + 10) + 'px;background:rgba(10,10,8,0.96);border:1px solid rgba(200,169,110,0.5);border-radius:8px;padding:8px 13px;font-size:12px;font-weight:700;color:#c8a96e;font-family:system-ui;z-index:100000;white-space:nowrap;backdrop-filter:blur(10px);';
+                    tooltip.textContent = '✦ Change this image';
+                    tooltip.style.cursor = 'pointer';
+                    tooltip.onclick = function() {
+                      window.parent.postMessage({ type: 'image-click', src: img.src, alt: alt }, '*');
+                      document.body.removeChild(tooltip);
+                    };
+                    setTimeout(() => document.body.removeChild(tooltip), 3000);
+                    document.body.appendChild(tooltip);
+                  });
+                  img.addEventListener('click', function(e) {
+                    if (e.ctrlKey || e.metaKey) {
+                      e.preventDefault();
+                      window.parent.postMessage({ type: 'image-click', src: img.src, alt: img.alt || img.src }, '*');
+                    }
+                  });
+                });
+              }
+              addImageListeners();
+
               function addDragHandles() {
                 var elements = document.querySelectorAll(TARGETS);
                 elements.forEach(function(el, idx) {
@@ -272,6 +303,20 @@ export default function BuilderPage() {
     return () => window.removeEventListener("message", handler);
   }, []);
 
+  // Listen for image click from iframe — allow image replacement prompts
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type !== "image-click") return;
+      const { src, alt } = e.data;
+      const desc = alt ? `alt="${alt}"` : src.slice(0, 50);
+      const prompt = `Replace the image ${desc} with a professional image for: `;
+      setInput(prev => prev || prompt);
+      chatInputRef.current?.focus();
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
   // Listen for section reorder from iframe
   useEffect(() => {
     const handler = (e: MessageEvent) => {
@@ -282,6 +327,20 @@ export default function BuilderPage() {
       const html = iframeDoc.documentElement.outerHTML;
       setState(s => ({ ...s, html }));
       // Optional: send to AI to acknowledge the reorder
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  // Listen for image click from iframe — allow image replacement prompts
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type !== "image-click") return;
+      const { src, alt } = e.data;
+      const desc = alt ? `alt="${alt}"` : src.slice(0, 50);
+      const prompt = `Replace the image ${desc} with a professional image for: `;
+      setInput(prev => prev || prompt);
+      chatInputRef.current?.focus();
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
