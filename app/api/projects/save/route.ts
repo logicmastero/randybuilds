@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   const supabase = createServerClient(supabaseUrl!, supabaseAnonKey!, {
     cookies: {
       getAll() { return req.cookies.getAll(); },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: Array<{name:string; value:string; options:Record<string,unknown>}>) {
         cookiesToSet.forEach(({ name, value, options }) => {
           req.cookies.set(name, value);
           res.cookies.set(name, value, options);

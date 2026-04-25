@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient(supabaseUrl!, supabaseAnonKey!, {
     cookies: {
       getAll() { return req.cookies.getAll(); },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: Array<{name:string; value:string; options:Record<string,unknown>}>) {
         // Write cookies onto BOTH the request (for server) and response (for browser)
         cookiesToSet.forEach(({ name, value, options }) => {
           req.cookies.set(name, value);
