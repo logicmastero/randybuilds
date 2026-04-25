@@ -1,5 +1,5 @@
 import { getPreview, isRedisConfigured } from "../../../lib/preview-store";
-import { getPreviewSession } from "../../../lib/db";
+import { getPreviewSession, getSiteBySlug, getDb } from "../../../lib/db";
 import { notFound } from "next/navigation";
 
 export const dynamic   = "force-dynamic";
@@ -9,17 +9,60 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+async function resolvePreview(slug: string) {
+  // 1. Redis
+  const redis = await getPreview(slug).catch(() => null);
+  if (redis) return { html: redis.html, businessName: redis.businessName, url: redis.url, source: "redis" };
+
+  // 2. Neon preview_sessions
+  const neon = await getPreviewSession(slug).catch(() => null);
+  if (neon) return { html: neon.html, businessName: neon.business_name, url: neon.input_url || "", source: "neon" };
+
+  // 3. Neon saved_sites
+  const saved = await getSiteBySlug(slug).catch(() => null);
+  if (saved) return { html: saved.html, businessName: saved.business_name, url: saved.url || "", source: "saved" };
+
+  return null;
+}
+
+async function incrementViewCount(slug: string) {
+  try {
+    const db = getDb();
+    // Try preview_sessions first, then saved_sites
+    const r = await db`
+      UPDATE preview_sessions
+      SET view_count = view_count + 1
+      WHERE slug = ${slug}
+      RETURNING slug
+    `;
+    if (!r.length) {
+      await db`
+        UPDATE saved_sites
+        SET view_count = view_count + 1
+        WHERE slug = ${slug}
+      `;
+    }
+  } catch { /* non-critical, don't fail the page */ }
+}
+
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const preview = await getPreview(slug);
-  if (!preview) return { title: "Preview Not Found — RandyBuilds" };
+  const preview = await resolvePreview(slug);
+  if (!preview) return { title: "Preview Not Found — Sitecraft" };
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://randybuilds.vercel.app";
   return {
-    title: `${preview.businessName} — AI Redesign Preview | RandyBuilds`,
-    description: `See what ${preview.businessName}'s website could look like — then start editing it for free with AI.`,
+    title: `${preview.businessName} — AI Website Preview | Sitecraft`,
+    description: `See what ${preview.businessName}'s new AI-generated website looks like. Edit it free in 60 seconds.`,
     openGraph: {
-      title: `${preview.businessName} — Redesigned by AI | RandyBuilds`,
-      description: `AI-powered redesign preview. Start editing for free in 60 seconds.`,
+      title: `${preview.businessName} — Redesigned by AI | Sitecraft`,
+      description: `AI-powered website preview. Start editing for free.`,
       type: "website",
+      url: `${APP_URL}/preview/${slug}`,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${preview.businessName} — AI Website`,
+      description: "See this AI-generated website and build your own for free.",
     },
   };
 }
@@ -27,95 +70,78 @@ export async function generateMetadata({ params }: Props) {
 export default async function PreviewPage({ params }: Props) {
   const { slug } = await params;
 
-  // Try Redis first (fast), then Neon (durable fallback)
-  let neonPreview = null;
-  try {
-    neonPreview = await getPreviewSession(slug);
-  } catch (_e) {}
+  const preview = await resolvePreview(slug);
 
-  const shareable = process.env.SHAREABLE_LINKS_ENABLED === "true" || isRedisConfigured() || !!neonPreview;
-
-  if (!shareable) {
+  if (!preview) {
+    // Graceful "not found" rather than 404 crash — offer to generate fresh
     return (
       <html lang="en">
         <head>
-          <title>Shareable Links Coming Soon — RandyBuilds</title>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;900&display=swap" rel="stylesheet" />
+          <title>Preview Expired — Sitecraft</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;700&display=swap" rel="stylesheet" />
         </head>
-        <body style={{
-          background: "#080808", color: "#f0f0f0",
-          fontFamily: "'Inter', sans-serif",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          minHeight: "100vh", textAlign: "center", padding: "24px", margin: 0,
-        }}>
+        <body style={{ background: "#0b0b09", color: "#e8e2d8", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", textAlign: "center", padding: 24, margin: 0 }}>
           <div>
-            <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🔗</div>
-            <h1 style={{ fontSize: "2rem", fontWeight: 900, marginBottom: "12px" }}>
-              Shareable links coming soon
-            </h1>
-            <p style={{ color: "#555", maxWidth: "400px", margin: "0 auto 32px" }}>
-              Persistent preview links are being set up. Generate a fresh preview below.
+            <div style={{ fontSize: "3rem", marginBottom: 16 }}>🔗</div>
+            <h1 style={{ fontFamily: "Instrument Serif, serif", fontSize: "clamp(24px,4vw,36px)", marginBottom: 12 }}>Preview expired</h1>
+            <p style={{ color: "rgba(232,226,216,0.5)", maxWidth: 360, margin: "0 auto 32px", lineHeight: 1.6, fontSize: 15 }}>
+              AI previews are stored for 30 days. This one has expired. Generate a fresh site below.
             </p>
-            <a href="/" style={{
-              padding: "14px 32px",
-              background: "linear-gradient(135deg,#c8a96e,#a07840)",
-              color: "#0a0a08", borderRadius: "10px", fontWeight: 800,
-              fontSize: ".95rem", textDecoration: "none", display: "inline-block",
-            }}>Generate Preview →</a>
+            <a href="/" style={{ padding: "14px 32px", background: "#c8a96e", color: "#0a0a08", borderRadius: 10, fontWeight: 800, fontSize: 14, textDecoration: "none", display: "inline-block" }}>
+              ✦ Generate new preview →
+            </a>
           </div>
         </body>
       </html>
     );
   }
 
-  const preview = await getPreview(slug);
-  if (!preview) notFound();
+  // Increment view count — non-blocking
+  incrementViewCount(slug);
 
-  // Encode the preview data to pass to the builder
-  const encodedHtml = encodeURIComponent(preview.html);
-  const encodedName = encodeURIComponent(preview.businessName);
-  const encodedUrl = encodeURIComponent(preview.url);
-
-  // Banner injected into the preview iframe — updated to push into the AI builder
   const bannerScript = `
     <script>
       window.addEventListener('DOMContentLoaded', function() {
         var banner = document.createElement('div');
-        banner.id = 'rb-banner';
         banner.innerHTML = \`
-          <div style="position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(10,10,8,0.96);backdrop-filter:blur(16px);border-bottom:1px solid rgba(200,169,110,0.3);display:flex;align-items:center;justify-content:space-between;padding:10px 20px;gap:16px;font-family:system-ui,sans-serif;flex-wrap:wrap;">
+          <div style="position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(10,10,8,0.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(200,169,110,0.3);display:flex;align-items:center;justify-content:space-between;padding:10px 20px;gap:12px;font-family:system-ui,sans-serif;flex-wrap:wrap;">
             <div>
-              <span style="color:#c8a96e;font-weight:800;font-size:13px;letter-spacing:0.04em">✦ AI PREVIEW</span>
-              <span style="color:rgba(232,224,208,0.6);font-size:12px;margin-left:10px">This is a live AI redesign of ${preview.businessName}</span>
+              <span style="color:#c8a96e;font-weight:800;font-size:12px;letter-spacing:0.08em;text-transform:uppercase">✦ AI Preview</span>
+              <span style="color:rgba(232,224,208,0.5);font-size:12px;margin-left:10px">${preview.businessName}</span>
             </div>
-            <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">
-              <a href="/" style="padding:7px 14px;background:transparent;border:1px solid rgba(232,224,208,0.2);color:rgba(232,224,208,0.7);border-radius:8px;font-weight:600;font-size:12px;text-decoration:none;display:inline-block">
-                New Preview
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <a href="/" style="padding:6px 13px;background:transparent;border:1px solid rgba(232,224,208,0.15);color:rgba(232,224,208,0.6);border-radius:7px;font-weight:600;font-size:12px;text-decoration:none;display:inline-flex;align-items:center">
+                New Site
               </a>
-              <a href="/build-from-preview?slug=${slug}" style="padding:8px 20px;background:linear-gradient(135deg,#c8a96e,#a07840);color:#0a0a08;border-radius:8px;font-weight:800;font-size:13px;text-decoration:none;display:inline-block">
-                ✦ Start Editing This Site →
+              <a href="/build-from-preview?slug=${slug}" style="padding:7px 18px;background:#c8a96e;color:#0a0a08;border-radius:7px;font-weight:800;font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+                ✦ Edit this site →
               </a>
             </div>
           </div>
         \`;
-        document.body.appendChild(banner);
-        document.body.style.paddingTop = '50px';
+        document.body.prepend(banner);
+        document.body.style.paddingTop = '48px';
       });
     </script>
   `;
 
-  const htmlWithBanner = preview.html.replace("<head>", "<head>" + bannerScript);
+  const htmlWithBanner = preview.html.includes("</head>")
+    ? preview.html.replace("</head>", bannerScript + "</head>")
+    : preview.html.replace("<body", bannerScript + "<body");
 
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{preview.businessName} — AI Redesign Preview | RandyBuilds</title>
+        <title>{preview.businessName} — AI Website Preview | Sitecraft</title>
       </head>
       <body
         style={{ margin: 0, padding: 0 }}
-        dangerouslySetInnerHTML={{ __html: htmlWithBanner.replace(/^[\s\S]*?<body[^>]*>/, "").replace(/<\/body>[\s\S]*$/, "") }}
+        dangerouslySetInnerHTML={{
+          __html: htmlWithBanner.replace(/^[\s\S]*?<body[^>]*>/, "").replace(/<\/body>[\s\S]*$/, ""),
+        }}
       />
     </html>
   );
