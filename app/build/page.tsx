@@ -116,11 +116,85 @@ export default function BuilderPage() {
   useEffect(() => {
     if (!state.html) return;
     requestAnimationFrame(() => {
-      const doc = iframeRef.current?.contentDocument;
+      const iframe = iframeRef.current;
+      const doc = iframe?.contentDocument;
       if (!doc) return;
       doc.open(); doc.write(state.html); doc.close();
+
+      // Inject section-click helpers after render
+      setTimeout(() => {
+        try {
+          const iDoc = iframe?.contentDocument;
+          if (!iDoc) return;
+          const script = iDoc.createElement("script");
+          script.textContent = `
+            (function() {
+              if (window.__rb_injected) return;
+              window.__rb_injected = true;
+              var hoveredEl = null;
+              var tooltip = document.createElement('div');
+              tooltip.style.cssText = 'position:fixed;z-index:99999;background:rgba(10,10,8,0.96);border:1px solid rgba(200,169,110,0.5);border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700;color:#c8a96e;font-family:system-ui,sans-serif;pointer-events:none;display:none;white-space:nowrap;backdrop-filter:blur(10px);';
+              tooltip.textContent = '✦ Click to edit this section';
+              document.body.appendChild(tooltip);
+
+              var TARGETS = 'section, header, footer, main, article, aside, [data-section], .hero, .services, .testimonials, .faq, .pricing, .contact, .gallery, .team, .cta, .about, .stats';
+
+              document.addEventListener('mouseover', function(e) {
+                var el = e.target.closest(TARGETS);
+                if (!el || el === document.body || el === document.documentElement) return;
+                if (hoveredEl !== el) {
+                  if (hoveredEl) hoveredEl.style.outline = '';
+                  hoveredEl = el;
+                  el.style.outline = '2px solid rgba(200,169,110,0.5)';
+                  el.style.outlineOffset = '-2px';
+                }
+                tooltip.style.display = 'block';
+                tooltip.style.top = (e.clientY + 14) + 'px';
+                tooltip.style.left = Math.min(e.clientX + 10, window.innerWidth - 220) + 'px';
+              });
+
+              document.addEventListener('mouseout', function(e) {
+                if (hoveredEl && !hoveredEl.contains(e.relatedTarget)) {
+                  hoveredEl.style.outline = '';
+                  hoveredEl = null;
+                }
+                tooltip.style.display = 'none';
+              });
+
+              document.addEventListener('click', function(e) {
+                var el = e.target.closest(TARGETS);
+                if (!el) return;
+                e.preventDefault(); e.stopPropagation();
+                var tagName = el.tagName.toLowerCase();
+                var cls = el.className && typeof el.className === 'string' ? el.className.split(' ').filter(function(c){return c&&c.length<20}).slice(0,2).join(' ') : '';
+                var sectionLabel = cls || tagName;
+                var text = (el.textContent || '').trim().slice(0, 60);
+                window.parent.postMessage({ type: 'section-click', sectionLabel: sectionLabel, sectionText: text }, '*');
+                el.style.outline = '2px solid rgba(200,169,110,0.9)';
+                setTimeout(function(){ el.style.outline = ''; }, 800);
+              }, true);
+            })();
+          `;
+          iDoc.head?.appendChild(script);
+        } catch { /* cross-origin or timing issue — ignore */ }
+      }, 200);
     });
   }, [state.html]);
+
+  // Listen for section-click messages from iframe
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type !== "section-click") return;
+      const { sectionLabel, sectionText } = e.data;
+      const prompt = sectionText
+        ? `Edit the ${sectionLabel} section that contains "${sectionText.slice(0, 40)}" — `
+        : `Edit the ${sectionLabel} section — `;
+      setInput(prev => prev || prompt);
+      chatInputRef.current?.focus();
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   // ── Auto-scroll chat ───────────────────────────────────────────────────────
   useEffect(() => {
