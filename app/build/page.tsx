@@ -57,6 +57,17 @@ const COLOR_PALETTES: Array<{ label: string; color: string; prompt: string }> = 
   { label: "White",   color: "#ffffff", prompt: "Switch to a clean white/light color scheme — light background, dark text" },
 ];
 
+const FONT_STACKS: Array<{ label: string; prompt: string }> = [
+  { label: "Modern",    prompt: "Use modern fonts: Inter for body, Instrument Serif for headings. Make it clean and professional." },
+  { label: "Classic",   prompt: "Use classic fonts: Georgia or Times New Roman for body, Garamond for headings. Make it elegant." },
+  { label: "Bold",      prompt: "Use bold fonts: Montserrat for body, Playfair Display for headings. Make it striking and modern." },
+  { label: "Minimal",   prompt: "Use minimal fonts: system fonts (helvetica, arial) throughout. Keep it super clean and fast-loading." },
+  { label: "Friendly",  prompt: "Use friendly fonts: Poppins for both body and headings. Make it approachable and warm." },
+  { label: "Corporate", prompt: "Use corporate fonts: Open Sans for body, Lato for headings. Make it professional and trustworthy." },
+  { label: "Serif",     prompt: "Use serif fonts: all serif — Lora for body, PT Serif for headings. Make it timeless." },
+  { label: "Sans Bold", prompt: "Use bold sans fonts: Roboto for body, IBM Plex Sans Bold for headings. Make it strong and modern." },
+];
+
 export default function BuilderPage() {
   const [state, setState] = useState<BuildState>({
     html: "", businessName: "", sourceUrl: "", history: [], isLoading: true,
