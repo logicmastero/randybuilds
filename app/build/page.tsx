@@ -83,6 +83,7 @@ export default function BuilderPage() {
   const [chatWidth, setChatWidth] = useState(360);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showShareToast, setShowShareToast] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
@@ -328,6 +329,16 @@ export default function BuilderPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [handleUndo, handleRedo]);
+
+  // ── History timeline ──────────────────────────────────────────────────────
+  const jumpToHistoryPoint = useCallback((index: number) => {
+    if (index < 0 || index >= undoStack.length) return;
+    const snap = undoStack[index];
+    setState(s => ({ ...s, html: snap.html }));
+    setUndoStack(u => u.slice(0, index));
+    setRedoStack([]);
+    setShowHistory(false);
+  }, [undoStack]);
 
   // ── Share link ────────────────────────────────────────────────────────────
   const handleShare = useCallback(async () => {
@@ -626,6 +637,7 @@ export default function BuilderPage() {
         {/* Right */}
         <div style={{ display:"flex", alignItems:"center", gap:7, flexShrink:0 }}>
           <button className="icon-btn" onClick={handleUndo} disabled={!undoStack.length} title="Undo (Ctrl+Z)">↩ Undo</button>
+          <button className="icon-btn" onClick={()=>setShowHistory(true)} disabled={!undoStack.length} style={{ fontSize:11 }} title={`${undoStack.length} edits`}>⏱ History</button>
           <button className="icon-btn" onClick={handleRedo} disabled={!redoStack.length} title="Redo (Ctrl+Y)">↪ Redo</button>
           <button className="icon-btn" onClick={handleShare} title="Copy shareable link">⎘ Share</button>
           <button className="icon-btn" onClick={handleDownload}>↓ HTML</button>
@@ -843,6 +855,59 @@ export default function BuilderPage() {
           )}
         </div>
       </div>
+
+      {/* ─── HISTORY MODAL ────────────────────────────────────────────────────── */}
+      {showHistory && (
+        <>
+          <div className="overlay-close" onClick={()=>setShowHistory(false)} />
+          <div className="overlay-panel" style={{ alignItems:"flex-start", paddingTop:60 }}>
+            <div style={{
+              background:"#131310", border:"1px solid rgba(200,169,110,0.2)", borderRadius:16,
+              width:"100%", maxWidth:360, maxHeight:"60vh", overflow:"hidden",
+              display:"flex", flexDirection:"column",
+            }}>
+              <div style={{ padding:"16px 20px", borderBottom:"1px solid #1e1e18" }}>
+                <div style={{ fontSize:12, fontWeight:800, color:"#e8e0d0", marginBottom:4 }}>Edit History</div>
+                <div style={{ fontSize:11, color:"rgba(232,224,208,0.4)" }}>{undoStack.length} changes</div>
+              </div>
+              <div style={{ flex:1, overflowY:"auto", padding:"10px 14px" }}>
+                {undoStack.length === 0 ? (
+                  <div style={{ padding:"20px", textAlign:"center", color:"rgba(232,224,208,0.3)", fontSize:12 }}>No edits yet</div>
+                ) : (
+                  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                    {[...undoStack].reverse().map((snap, revIdx) => {
+                      const idx = undoStack.length - revIdx - 1;
+                      return (
+                        <button key={idx} onClick={()=>jumpToHistoryPoint(idx)} style={{
+                          background:"#1a1a14", border:"1px solid #252520",
+                          borderRadius:8, padding:"8px 12px", textAlign:"left",
+                          color:"#e8e2d8", fontSize:12, cursor:"pointer", transition:"all 0.15s",
+                          fontFamily:"inherit",
+                        }}
+                        onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.background="rgba(200,169,110,0.08)";(e.currentTarget as HTMLButtonElement).style.borderColor="rgba(200,169,110,0.25)"}}
+                        onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.background="#1a1a14";(e.currentTarget as HTMLButtonElement).style.borderColor="#252520"}}
+                        >
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10 }}>
+                            <span style={{ flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontSize:11 }}>{snap.label || "Edit"}</span>
+                            <span style={{ fontSize:10, color:"rgba(232,224,208,0.35)", flexShrink:0 }}>−{revIdx}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div style={{ padding:"12px 14px", borderTop:"1px solid #1e1e18", display:"flex", gap:8 }}>
+                <button onClick={()=>setShowHistory(false)} style={{
+                  background:"transparent", border:"1px solid rgba(255,255,255,0.08)",
+                  borderRadius:8, padding:"7px 14px", color:"rgba(232,224,208,0.6)",
+                  fontSize:12, cursor:"pointer", flex:1, fontWeight:600, fontFamily:"inherit",
+                }}>Close</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ─── SHARE TOAST ─────────────────────────────────────────────────────── */}
       {showShareToast && (
