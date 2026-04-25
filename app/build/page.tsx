@@ -70,6 +70,8 @@ export default function BuilderPage() {
   const [showSections, setShowSections] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [chatWidth, setChatWidth] = useState(360);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [showShareToast, setShowShareToast] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [redoStack, setRedoStack] = useState<Snapshot[]>([]);
@@ -239,6 +241,33 @@ export default function BuilderPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleUndo, handleRedo]);
 
+  // ── Share link ────────────────────────────────────────────────────────────
+  const handleShare = useCallback(async () => {
+    // Save to Neon first so the link persists
+    const slug = state.slug || `site-${Date.now()}`;
+    try {
+      const res = await fetch("/api/projects/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: { html: state.html, businessName: state.businessName, sourceUrl: state.sourceUrl, slug } }),
+      });
+      const d = await res.json();
+      const finalSlug = d.slug || slug;
+      const url = `${window.location.origin}/preview/${finalSlug}`;
+      setShareUrl(url);
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setShowShareToast(true);
+      setTimeout(() => setShowShareToast(false), 3000);
+    } catch {
+      // Fallback — just share the preview URL with slug
+      const url = `${window.location.origin}/preview/${slug}`;
+      setShareUrl(url);
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setShowShareToast(true);
+      setTimeout(() => setShowShareToast(false), 3000);
+    }
+  }, [state]);
+
   // ── Panel resize drag ──────────────────────────────────────────────────────
   const startDrag = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -294,6 +323,23 @@ export default function BuilderPage() {
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let accumulated = "";
+      let lastPreviewUpdate = 0;
+
+      const tryLivePreview = (text: string) => {
+        // Find the start of the HTML in the accumulated JSON
+        const htmlStart = text.indexOf("<!DOCTYPE");
+        if (htmlStart === -1) return;
+        const partial = text.slice(htmlStart);
+        // Only update preview if we have a meaningful amount (avoids flicker)
+        if (partial.length < 1500) return;
+        // Throttle to every 800ms max
+        const now = Date.now();
+        if (now - lastPreviewUpdate < 800) return;
+        lastPreviewUpdate = now;
+        // Close any open tags so it renders decently
+        const closedHtml = partial + (partial.includes("</html>") ? "" : "\n</body></html>");
+        setState(s => ({ ...s, html: closedHtml }));
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -306,8 +352,8 @@ export default function BuilderPage() {
             const data = JSON.parse(line.slice(6));
             if (data.chunk) {
               accumulated += data.chunk;
-              // Show streaming indicator but don't update preview mid-stream
-              setStreamingText(accumulated.length > 0 ? "…" : "");
+              setStreamingText("building…");
+              tryLivePreview(accumulated);
             }
             if (data.done) {
               setStreamingText("");
@@ -493,6 +539,7 @@ export default function BuilderPage() {
         <div style={{ display:"flex", alignItems:"center", gap:7, flexShrink:0 }}>
           <button className="icon-btn" onClick={handleUndo} disabled={!undoStack.length} title="Undo (Ctrl+Z)">↩ Undo</button>
           <button className="icon-btn" onClick={handleRedo} disabled={!redoStack.length} title="Redo (Ctrl+Y)">↪ Redo</button>
+          <button className="icon-btn" onClick={handleShare} title="Copy shareable link">⎘ Share</button>
           <button className="icon-btn" onClick={handleDownload}>↓ HTML</button>
           <button
             className="icon-btn"
@@ -708,6 +755,25 @@ export default function BuilderPage() {
           )}
         </div>
       </div>
+
+      {/* ─── SHARE TOAST ─────────────────────────────────────────────────────── */}
+      {showShareToast && (
+        <div style={{
+          position:"fixed", bottom:24, left:"50%", transform:"translateX(-50%)",
+          background:"rgba(10,10,8,0.96)", border:"1px solid rgba(200,169,110,0.4)",
+          borderRadius:10, padding:"11px 20px", fontSize:13, fontWeight:600,
+          color:"#c8a96e", display:"flex", alignItems:"center", gap:10,
+          zIndex:1000, backdropFilter:"blur(16px)", boxShadow:"0 8px 32px rgba(0,0,0,0.5)",
+          animation:"fadeUp 0.2s ease forwards",
+        }}>
+          <span>✓ Link copied to clipboard</span>
+          {shareUrl && (
+            <a href={shareUrl} target="_blank" rel="noreferrer" style={{ color:"rgba(200,169,110,0.6)", fontSize:11, textDecoration:"none" }}>
+              open →
+            </a>
+          )}
+        </div>
+      )}
 
       {/* ─── PUBLISH MODAL ───────────────────────────────────────────────────── */}
       {showPublish && (
