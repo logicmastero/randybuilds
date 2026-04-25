@@ -17,72 +17,76 @@ interface ChatEditRequest {
   sourceUrl?: string;
   slug?: string;
   history?: Message[];
+  stream?: boolean;
 }
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `You are Randy — an expert AI website builder embedded in RandyBuilds, a live AI website editor (like Lovable or Base44).
+const SYSTEM_PROMPT = `You are Randy — an expert AI website builder embedded in Sitecraft, a live AI website editor.
 
-The user is editing their website in real time through a chat interface. You receive their request plus the current HTML of their site, and you return an updated version of the complete HTML.
+The user is editing their website in real time through a chat interface. You receive their request plus the current HTML, and return an updated complete HTML document.
 
 YOUR JOB:
-1. Make EXACTLY the change the user requests — no more, no less (unless the change requires structural updates)
-2. Preserve all existing content unless explicitly told to change it
-3. Return a COMPLETE, valid HTML document every time
+1. Make EXACTLY the change the user requests — precisely and surgically
+2. Preserve ALL existing content unless explicitly told to change it
+3. Return a COMPLETE, valid HTML document every single time — never truncate
 4. Make the site look premium, modern, and professional
-5. Use clean CSS — no external dependencies except Google Fonts and standard CDNs
+5. Use inline CSS only — no external dependencies except Google Fonts
 
-WHEN BUILDING FROM SCRATCH (user describes their business):
-- Generate a complete, beautiful single-page website
-- Include: Hero, Services/Features, Social Proof (testimonials), CTA section, Footer
-- Use real-looking content (real phone numbers, addresses are optional but include placeholders that look real)
-- Make it mobile-responsive
-- Use a dark, premium aesthetic as default unless they specify otherwise
+SPECIAL COMMANDS — recognize and handle:
+- "add [section]" → append a well-designed section (hero/services/testimonials/faq/contact/gallery/pricing/team/cta)
+- "remove [section]" → cleanly remove that section
+- "change color to [color]" → update the primary color throughout
+- "make it [style]" → dark/light/minimal/bold/colorful — retheme the whole site
+- "add section above/below [X]" → insert at right position
+- "undo" → respond that they should use the Ctrl+Z button
+- "I'm a [business type] in [city]" → build a complete site from scratch
 
-DESIGN PRINCIPLES:
-- Premium over generic — this is not a template, it's custom
-- Every section has purpose and converts visitors to customers
-- Typography: system-ui or Google Fonts (Instrument Serif for headings, Inter for body is a great combo)
-- Colors: use strong contrast, purposeful palette
-- CTAs: clear, prominent, action-oriented
+WHEN BUILDING FROM SCRATCH:
+- Generate a COMPLETE single-page website (8-10 sections minimum)
+- Include: Hero, Services, Process/How it works, Social Proof (3 testimonials), Stats, FAQ, CTA, Footer
+- Use real-looking content — real-sounding business name, local phone format, actual services
+- Mobile-responsive with CSS media queries
+- Premium dark aesthetic by default (bg #0b0b09, accent #c8a96e) unless specified
+- Typography: Instrument Serif (headings) + Inter (body) via Google Fonts
 
-RESPONSE FORMAT — return ONLY valid JSON:
-{
-  "html": "<complete updated HTML document>",
-  "message": "Brief friendly message about what you changed (1-2 sentences)",
-  "businessName": "Business name if changed, otherwise the existing one"
-}
+DESIGN STANDARDS:
+- Hero: full-viewport, compelling headline, subtext, 2 CTAs
+- Cards: subtle borders, hover effects, consistent spacing
+- CTAs: gold (#c8a96e) primary, ghost secondary
+- Stats strip: large numbers, clear labels
+- Testimonials: star ratings, name, company
+- Mobile: stack columns, touch targets ≥44px, hidden complex nav on small screens
 
-IMPORTANT:
-- ALWAYS return complete HTML (not fragments)
-- The html must be a full valid HTML document with <!DOCTYPE html>
-- Never truncate or use "..." in the HTML
-- Keep all existing sections unless explicitly asked to remove them`;
+RESPONSE FORMAT — return ONLY valid JSON, no markdown, no code blocks:
+{"html":"<complete updated HTML>","message":"What I changed (1-2 sentences, casual tone)","businessName":"Business name"}
+
+CRITICAL RULES:
+- ALWAYS return complete HTML starting with <!DOCTYPE html>
+- NEVER use ellipsis, comments like "rest of content here", or truncation
+- If the current HTML is long, reproduce it FULLY with only the requested changes
+- Keep all sections, styles, and scripts that exist unless asked to remove them
+- JSON must be valid — escape all quotes in HTML using \\"`;
 
 export async function POST(req: NextRequest) {
+  const startMs = Date.now();
   try {
     const body: ChatEditRequest = await req.json();
-    const { message, currentHtml, businessName, sourceUrl, slug, history = [] } = body;
+    const { message, currentHtml, businessName, sourceUrl, slug, history = [], stream: useStream = true } = body;
 
     if (!message) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
-    // Build conversation context
     const conversationMessages: Anthropic.Messages.MessageParam[] = [];
 
-    // Add history (last 6 turns)
-    for (const msg of history.slice(-6)) {
-      conversationMessages.push({
-        role: msg.role,
-        content: msg.content,
-      });
+    for (const msg of history.slice(-8)) {
+      conversationMessages.push({ role: msg.role, content: msg.content });
     }
 
-    // Add the current request with context
-    const userContent = `Current website HTML:
+    const userContent = `Current site HTML (${currentHtml.length} chars):
 \`\`\`html
-${currentHtml.slice(0, 12000)}${currentHtml.length > 12000 ? "\n<!-- ... truncated ... -->" : ""}
+${currentHtml}
 \`\`\`
 
 Business name: ${businessName || "Unknown"}
@@ -90,83 +94,109 @@ ${sourceUrl ? `Source URL: ${sourceUrl}` : ""}
 
 User request: ${message}
 
-Return the complete updated HTML and a brief message about what you changed.`;
+Return ONLY valid JSON with the updated complete HTML.`;
 
     conversationMessages.push({ role: "user", content: userContent });
 
+    // ── Streaming path ─────────────────────────────────────────────────────
+    if (useStream) {
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream({
+        async start(controller) {
+          let fullText = "";
+          try {
+            const stream = await client.messages.stream({
+              model: "claude-opus-4-5",
+              max_tokens: 16000,
+              system: SYSTEM_PROMPT,
+              messages: conversationMessages,
+            });
+
+            for await (const chunk of stream) {
+              if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+                fullText += chunk.delta.text;
+                // Stream the raw text chunks to client
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+              }
+            }
+
+            // Parse and send final result
+            let parsed: { html: string; message: string; businessName: string };
+            try {
+              const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+              parsed = JSON.parse(jsonMatch ? jsonMatch[0] : fullText);
+            } catch {
+              // If JSON parse fails, try to extract HTML directly
+              const htmlMatch = fullText.match(/<!DOCTYPE html>[\s\S]*/i);
+              parsed = {
+                html: htmlMatch ? htmlMatch[0] : currentHtml,
+                message: "Updated your site.",
+                businessName: businessName || "Your Business",
+              };
+            }
+
+            // Save to preview store
+            if (parsed.html && parsed.html.length > 200) {
+              const newSlug = slug || `edit-${Date.now()}`;
+              Promise.all([
+                savePreview(newSlug, { html: parsed.html, businessName: parsed.businessName || businessName, url: sourceUrl || "", source: "claude", createdAt: Date.now() }).catch(() => {}),
+                savePreviewSession({ slug: newSlug, html: parsed.html, business_name: parsed.businessName || businessName, input_url: sourceUrl, source: "claude" }).catch(() => {}),
+                logGeneration({ input_type: "description", input_value: message, success: true, duration_ms: Date.now() - startMs }).catch(() => {}),
+              ]);
+            }
+
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, html: parsed.html, message: parsed.message, businessName: parsed.businessName })}\n\n`));
+            controller.close();
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Unknown error";
+            console.error("[chat-edit stream]", msg);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg, html: currentHtml, message: "Something went wrong — try again." })}\n\n`));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
+    // ── Non-streaming fallback ──────────────────────────────────────────────
     const response = await client.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 8000,
+      model: "claude-opus-4-5",
+      max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: conversationMessages,
     });
 
     const rawText = response.content[0].type === "text" ? response.content[0].text : "";
 
-    // Parse JSON response
-    let result: { html: string; message: string; businessName?: string };
+    let parsed: { html: string; message: string; businessName: string };
     try {
-      // Extract JSON from response (handle markdown code blocks)
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No JSON found");
-      result = JSON.parse(jsonMatch[0]);
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
     } catch {
-      // Fallback: if Claude returned raw HTML somehow
-      if (rawText.includes("<!DOCTYPE html") || rawText.includes("<html")) {
-        result = {
-          html: rawText,
-          message: "Done! Here's your updated site.",
-          businessName,
-        };
-      } else {
-        return NextResponse.json(
-          { error: "Failed to parse AI response", raw: rawText.slice(0, 200) },
-          { status: 500 }
-        );
-      }
+      const htmlMatch = rawText.match(/<!DOCTYPE html>[\s\S]*/i);
+      parsed = { html: htmlMatch ? htmlMatch[0] : currentHtml, message: "Updated.", businessName };
     }
 
-    const finalHtml = result.html;
-    const finalName = result.businessName || businessName;
-
-    // Persist updated HTML to both Redis and Neon (non-blocking)
-    if (slug) {
-      savePreview(slug, {
-        html: finalHtml,
-        businessName: finalName,
-        url: sourceUrl,
-        source: "claude",
-        createdAt: Date.now(),
-      }).catch((e: unknown) => console.error("[chat-edit] Redis save:", e));
-
-      savePreviewSession({
-        slug,
-        business_name: finalName,
-        html: finalHtml,
-        input_url: sourceUrl || undefined,
-        source: "claude",
-      }).catch((e: unknown) => console.error("[chat-edit] Neon save:", e));
+    if (parsed.html?.length > 200) {
+      const newSlug = slug || `edit-${Date.now()}`;
+      Promise.all([
+        savePreview(newSlug, { html: parsed.html, businessName: parsed.businessName || businessName, url: sourceUrl || "", source: "claude", createdAt: Date.now() }).catch(() => {}),
+        savePreviewSession({ slug: newSlug, html: parsed.html, business_name: parsed.businessName || businessName, input_url: sourceUrl, source: "claude" }).catch(() => {}),
+        logGeneration({ input_type: "description", input_value: message, success: true, duration_ms: Date.now() - startMs }).catch(() => {}),
+      ]);
     }
 
-    // Log the edit
-    logGeneration({
-      input_type: "edit",
-      input_value: message.slice(0, 200),
-      model: "claude-opus-4-5",
-      duration_ms: response.usage ? undefined : undefined,
-      success: true,
-    }).catch(() => {});
-
-    return NextResponse.json({
-      html: finalHtml,
-      message: result.message || "Done! What would you like to change next?",
-      businessName: finalName,
-    });
-  } catch (err) {
-    console.error("[chat-edit] Error:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: true, html: parsed.html, message: parsed.message, businessName: parsed.businessName });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[chat-edit]", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

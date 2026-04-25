@@ -11,7 +11,7 @@ export interface PreviewRecord {
   html: string;
   businessName: string;
   url: string;
-  source: "claude" | "fallback";
+  source: string; // "claude", "fallback", "claude-edit", etc
   createdAt: number;
 }
 
