@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { getSupabaseClient } from "../lib/supabase";
 
 const PHRASES = [
   "converts visitors into customers.",
@@ -66,6 +67,20 @@ function extractBusinessNameFromDescription(desc: string) {
 }
 
 export default function Home() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userInitial, setUserInitial] = useState("");
+  useEffect(() => {
+    try {
+      const sb = getSupabaseClient();
+      sb.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setIsLoggedIn(true);
+          const name = session.user.user_metadata?.full_name || session.user.email || "?";
+          setUserInitial(name[0].toUpperCase());
+        }
+      });
+    } catch { /* supabase not configured */ }
+  }, []);
   const [url, setUrl] = useState("");
   const [step, setStep] = useState<Step>("input");
   const [error, setError] = useState("");
@@ -382,19 +397,26 @@ export default function Home() {
       {step === "input" && (
         <>
           <nav className="nav">
-            <a href="/" className="nav-logo">Randy<span>Builds</span></a>
+            <a href="/" className="nav-logo">Site<span>craft</span></a>
             <div className="nav-links">
               <a href="#how" className="nav-link">How it works</a>
               <a href="#pricing" className="nav-link">Pricing</a>
-              <a href="mailto:hello@randybuilds.com" className="nav-link">Contact</a>
+              <a href="mailto:hello@sitecraftai.com" className="nav-link">Contact</a>
             </div>
-            <a href="#try" className="nav-cta">See your site free →</a>
+            {isLoggedIn ? (
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <a href="/dashboard" className="nav-link">Dashboard</a>
+                <a href="/dashboard" style={{width:32,height:32,borderRadius:"50%",background:"rgba(200,169,110,0.15)",border:"1px solid rgba(200,169,110,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"var(--gold)",textDecoration:"none"}}>{userInitial}</a>
+              </div>
+            ) : (
+              <a href="/login" className="nav-cta">Get started free →</a>
+            )}
           </nav>
 
           <section className="hero" id="try">
             <div className="hero-glow" />
             <div className="hero-noise" />
-            <div className="hero-badge a1"><span className="badge-dot" />AI Web Design — Alberta</div>
+            <div className="hero-badge a1"><span className="badge-dot" />AI-Powered Web Design</div>
             <h1 className="hero-h1 a2">
               A website that<br /><TypeCycle />
             </h1>
@@ -515,18 +537,18 @@ export default function Home() {
             <p className="cta-sub">No signup required. No credit card. Just drop your URL and see what you've been missing.</p>
             <div className="btn-row">
               <button className="btn-gold" onClick={() => { document.getElementById("try")?.scrollIntoView({behavior:"smooth"}); setTimeout(()=>inputRef.current?.focus(),600); }}>Build my site free →</button>
-              <a href="mailto:hello@randybuilds.com" className="btn-out">Talk to Randy</a>
+              <a href="mailto:hello@sitecraftai.com" className="btn-out">Talk to Randy</a>
             </div>
           </div>
 
           <footer className="footer">
-            <div className="f-logo">Randy<span>Builds</span></div>
+            <div className="f-logo">Site<span>craft</span></div>
             <div className="f-links">
               <a href="#how" className="f-link">How it works</a>
               <a href="#pricing" className="f-link">Pricing</a>
-              <a href="mailto:hello@randybuilds.com" className="f-link">Contact</a>
+              <a href="mailto:hello@sitecraftai.com" className="f-link">Contact</a>
             </div>
-            <div className="f-copy">© 2026 RandyBuilds · Alberta, Canada</div>
+            <div className="f-copy">© 2026 Sitecraft · Alberta, Canada · AI-Powered</div>
           </footer>
         </>
       )}
