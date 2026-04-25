@@ -72,6 +72,7 @@ export default function BuilderPage() {
   const [chatWidth, setChatWidth] = useState(360);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showShareToast, setShowShareToast] = useState(false);
+  const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [redoStack, setRedoStack] = useState<Snapshot[]>([]);
@@ -140,6 +141,67 @@ export default function BuilderPage() {
               document.body.appendChild(tooltip);
 
               var TARGETS = 'section, header, footer, main, article, aside, [data-section], .hero, .services, .testimonials, .faq, .pricing, .contact, .gallery, .team, .cta, .about, .stats';
+              var draggedEl = null;
+              var dragStartY = 0;
+
+              // ─ Add drag handles to all sections
+              function addDragHandles() {
+                var elements = document.querySelectorAll(TARGETS);
+                elements.forEach(function(el, idx) {
+                  if (el.__rb_drag_added) return;
+                  el.__rb_drag_added = true;
+                  el.style.position = 'relative';
+                  var handle = document.createElement('div');
+                  handle.className = '__rb_drag_handle';
+                  handle.style.cssText = 'position:absolute;left:0;top:0;width:24px;height:24px;cursor:grab;display:none;align-items:center;justify-content:center;background:rgba(200,169,110,0.2);border-radius:4px;font-size:12px;color:#c8a96e;z-index:1000;';
+                  handle.innerHTML = '⋮⋮';
+                  handle.onmousedown = function(e) {
+                    e.preventDefault(); e.stopPropagation();
+                    draggedEl = el;
+                    dragStartY = e.clientY;
+                    handle.style.background = 'rgba(200,169,110,0.4)';
+                    handle.style.cursor = 'grabbing';
+                  };
+                  el.appendChild(handle);
+                  el.addEventListener('mouseenter', function() {
+                    if (draggedEl) return;
+                    el.querySelector('.__rb_drag_handle').style.display = 'flex';
+                  });
+                  el.addEventListener('mouseleave', function() {
+                    if (draggedEl) return;
+                    el.querySelector('.__rb_drag_handle').style.display = 'none';
+                  });
+                });
+              }
+              addDragHandles();
+
+              // ─ Handle section drag
+              document.addEventListener('mousemove', function(e) {
+                if (!draggedEl) return;
+                var deltaY = e.clientY - dragStartY;
+                if (Math.abs(deltaY) < 40) return; // minimum drag distance
+                var rect = draggedEl.getBoundingClientRect();
+                var next = draggedEl.nextElementSibling;
+                var prev = draggedEl.previousElementSibling;
+                if (deltaY > 0 && next && next.matches(TARGETS)) {
+                  draggedEl.parentNode.insertBefore(next, draggedEl);
+                  dragStartY = e.clientY;
+                  window.parent.postMessage({ type: 'section-reordered' }, '*');
+                } else if (deltaY < 0 && prev && prev.matches(TARGETS)) {
+                  draggedEl.parentNode.insertBefore(draggedEl, prev);
+                  dragStartY = e.clientY;
+                  window.parent.postMessage({ type: 'section-reordered' }, '*');
+                }
+              });
+
+              document.addEventListener('mouseup', function(e) {
+                if (draggedEl) {
+                  var handle = draggedEl.querySelector('.__rb_drag_handle');
+                  handle.style.background = 'rgba(200,169,110,0.2)';
+                  handle.style.cursor = 'grab';
+                  draggedEl = null;
+                }
+              });
 
               document.addEventListener('mouseover', function(e) {
                 var el = e.target.closest(TARGETS);
@@ -193,6 +255,21 @@ export default function BuilderPage() {
         : `Edit the ${sectionLabel} section — `;
       setInput(prev => prev || prompt);
       chatInputRef.current?.focus();
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  // Listen for section reorder from iframe
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type !== "section-reordered") return;
+      // Read the new HTML order from iframe
+      const iframeDoc = iframeRef.current?.contentDocument;
+      if (!iframeDoc) return;
+      const html = iframeDoc.documentElement.outerHTML;
+      setState(s => ({ ...s, html }));
+      // Optional: send to AI to acknowledge the reorder
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
