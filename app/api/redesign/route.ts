@@ -1,3 +1,4 @@
+import { injectMobileMenu } from "@/lib/mobile-menu-generator";
 import { NextRequest, NextResponse } from "next/server";
 import { savePreview, isRedisConfigured } from "../../../lib/preview-store";
 import { savePreviewSession, logGeneration } from "../../../lib/db";
@@ -1191,13 +1192,14 @@ export async function POST(req: NextRequest) {
 
     const { copy, source, reason } = await generateRedesignCopy(data);
     const html = buildPreviewHTML(data, copy, source);
+    const htmlWithMobileMenu = injectMobileMenu(html, data.colors?.[0] || "#3b82f6");
     const slug = generateSlug(data.businessName);
 
     console.log(`[redesign] Saving preview slug="${slug}" source="${source}" redis=${isRedisConfigured()}`);
 
     // Persist to Redis (fast, in-memory fallback)
     await savePreview(slug, {
-      html,
+      html: htmlWithMobileMenu,
       businessName: data.businessName,
       url: data.url,
       source,
@@ -1211,7 +1213,7 @@ export async function POST(req: NextRequest) {
     savePreviewSession({
       slug,
       business_name: data.businessName,
-      html,
+      html: htmlWithMobileMenu,
       input_url: data.url || undefined,
       source,
       generation_ms: generationMs,
@@ -1226,6 +1228,16 @@ export async function POST(req: NextRequest) {
     }).catch((e: unknown) => console.error("[redesign] Log error:", e));
 
     return NextResponse.json({
+      previewUrl: `/preview/${slug}`,
+      previewHtml: htmlWithMobileMenu,       // blob URL instant display — frontend uses this first
+      businessName: data.businessName,
+      slug,
+      copy,
+      source,
+      fallbackReason: reason ?? null,
+      aiPowered: source === "claude",
+      persistedToRedis: isRedisConfigured(),
+    });
       previewUrl: `/preview/${slug}`,
       previewHtml: html,       // blob URL instant display — frontend uses this first
       businessName: data.businessName,
