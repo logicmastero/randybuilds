@@ -1,3 +1,4 @@
+import { getAnalyticsScript } from "@/lib/analytics-injector";
 import { injectMobileMenu } from "@/lib/mobile-menu-generator";
 import { NextRequest, NextResponse } from "next/server";
 import { savePreview, isRedisConfigured } from "../../../lib/preview-store";
@@ -1193,13 +1194,18 @@ export async function POST(req: NextRequest) {
     const { copy, source, reason } = await generateRedesignCopy(data);
     const html = buildPreviewHTML(data, copy, source);
     const htmlWithMobileMenu = injectMobileMenu(html, data.colors?.[0] || "#3b82f6");
+    
+    // Inject analytics tracking script
+    const analyticsScript = getAnalyticsScript(slug);
+    const analyticsTag = `<script>${analyticsScript}</script>`;
+    const htmlWithAnalytics = htmlWithMobileMenu.replace("</body>", `${analyticsTag}</body>`);
     const slug = generateSlug(data.businessName);
 
     console.log(`[redesign] Saving preview slug="${slug}" source="${source}" redis=${isRedisConfigured()}`);
 
     // Persist to Redis (fast, in-memory fallback)
     await savePreview(slug, {
-      html: htmlWithMobileMenu,
+      html: htmlWithAnalytics,
       businessName: data.businessName,
       url: data.url,
       source,
@@ -1213,7 +1219,7 @@ export async function POST(req: NextRequest) {
     savePreviewSession({
       slug,
       business_name: data.businessName,
-      html: htmlWithMobileMenu,
+      html: htmlWithAnalytics,
       input_url: data.url || undefined,
       source,
       generation_ms: generationMs,
@@ -1229,7 +1235,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       previewUrl: `/preview/${slug}`,
-      previewHtml: htmlWithMobileMenu,       // blob URL instant display — frontend uses this first
+      previewHtml: htmlWithAnalytics,       // blob URL instant display — frontend uses this first
       businessName: data.businessName,
       slug,
       copy,
