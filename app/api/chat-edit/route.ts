@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { savePreviewSession, logGeneration } from "../../../lib/db";
+import { savePreview } from "../../../lib/preview-store";
 
 export const maxDuration = 60;
 
@@ -13,6 +15,7 @@ interface ChatEditRequest {
   currentHtml: string;
   businessName: string;
   sourceUrl?: string;
+  slug?: string;
   history?: Message[];
 }
 
@@ -59,7 +62,7 @@ IMPORTANT:
 export async function POST(req: NextRequest) {
   try {
     const body: ChatEditRequest = await req.json();
-    const { message, currentHtml, businessName, sourceUrl, history = [] } = body;
+    const { message, currentHtml, businessName, sourceUrl, slug, history = [] } = body;
 
     if (!message) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
@@ -123,10 +126,41 @@ Return the complete updated HTML and a brief message about what you changed.`;
       }
     }
 
+    const finalHtml = result.html;
+    const finalName = result.businessName || businessName;
+
+    // Persist updated HTML to both Redis and Neon (non-blocking)
+    if (slug) {
+      savePreview(slug, {
+        html: finalHtml,
+        businessName: finalName,
+        url: sourceUrl,
+        source: "claude",
+        createdAt: Date.now(),
+      }).catch((e: unknown) => console.error("[chat-edit] Redis save:", e));
+
+      savePreviewSession({
+        slug,
+        business_name: finalName,
+        html: finalHtml,
+        input_url: sourceUrl || undefined,
+        source: "claude",
+      }).catch((e: unknown) => console.error("[chat-edit] Neon save:", e));
+    }
+
+    // Log the edit
+    logGeneration({
+      input_type: "edit",
+      input_value: message.slice(0, 200),
+      model: "claude-opus-4-5",
+      duration_ms: response.usage ? undefined : undefined,
+      success: true,
+    }).catch(() => {});
+
     return NextResponse.json({
-      html: result.html,
+      html: finalHtml,
       message: result.message || "Done! What would you like to change next?",
-      businessName: result.businessName || businessName,
+      businessName: finalName,
     });
   } catch (err) {
     console.error("[chat-edit] Error:", err);

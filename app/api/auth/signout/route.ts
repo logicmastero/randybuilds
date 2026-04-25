@@ -3,32 +3,32 @@ import { createServerClient } from "@supabase/ssr";
 
 export const dynamic = "force-dynamic";
 
-async function handleSignOut(req: NextRequest) {
-  const origin = new URL(req.url).origin;
-  const res = NextResponse.redirect(`${origin}/`);
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  if (!url || url.includes("placeholder")) return res;
+export async function POST(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  const supabase = createServerClient(url, key, {
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.includes("placeholder")) {
+    // If auth not configured, just clear cookies and redirect
+    const res = NextResponse.json({ ok: true, loggedOut: true });
+    res.cookies.delete("sb-*");
+    return res;
+  }
+
+  const res = NextResponse.next();
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
-      getAll() { return req.cookies.getAll(); },
-      setAll(cookiesToSet: Array<{name:string; value:string; options:Record<string,unknown>}>) {
+      getAll() {
+        return req.cookies.getAll();
+      },
+      setAll(cookiesToSet: Array<{ name: string; value: string; options: Record<string, unknown> }>) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          req.cookies.set(name, value);
           res.cookies.set(name, value, options as Parameters<typeof res.cookies.set>[2]);
         });
       },
     },
   });
-  await supabase.auth.signOut();
-  req.cookies.getAll().forEach(c => {
-    if (c.name.includes("auth") || c.name.startsWith("sb-")) {
-      res.cookies.set(c.name, "", { expires: new Date(0), path: "/", httpOnly: true });
-    }
-  });
-  return res;
-}
 
-export async function GET(req: NextRequest) { return handleSignOut(req); }
-export async function POST(req: NextRequest) { return handleSignOut(req); }
+  await supabase.auth.signOut().catch(() => {});
+
+  return NextResponse.json({ ok: true, loggedOut: true });
+}

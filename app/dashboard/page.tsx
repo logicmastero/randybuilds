@@ -222,6 +222,7 @@ function fmtMs(ms?: number) {
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [synced, setSynced] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [genLog, setGenLog] = useState<GenLog[]>([]);
@@ -269,12 +270,22 @@ export default function DashboardPage() {
     const supabase = getSupabaseClient();
     if (!supabase) { setLoading(false); return; }
 
-    const init = async () => {
+    const syncUser = async () => {
+    try {
+      await fetch("/api/auth/sync", { method: "POST" });
+      setSynced(true);
+    } catch (e) {
+      console.error("sync failed", e);
+    }
+  };
+
+  const init = async () => {
       const { data: { session } } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
       if (!session) { window.location.href = "/login"; return; }
       setUser(session.user);
       await loadData();
     };
+    syncUser();
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: unknown) => {
