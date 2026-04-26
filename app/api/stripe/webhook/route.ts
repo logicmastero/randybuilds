@@ -4,10 +4,7 @@ import { getDb } from "../../../../lib/db";
 
 export const dynamic = "force-dynamic";
 
-// Disable body parsing — Stripe needs raw body for signature verification
-export const config = {
-  api: { bodyParser: false },
-};
+// App Router: body parsing handled via req.arrayBuffer()
 
 export async function POST(req: NextRequest) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
