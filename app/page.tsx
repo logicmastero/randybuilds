@@ -87,30 +87,35 @@ function BuildProgress({ streamingHtml }: { streamingHtml: string }) {
   }, []);
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "#070706", overflow: "hidden" }}>
-      {/* Left: progress */}
-      <div style={{ width: 340, background: "#0a0a08", borderRight: "1px solid #1a1810", display: "flex", flexDirection: "column", padding: "48px 32px" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100svh", background: "#070706", overflow: "hidden" }}>
+      <style>{`
+        @media(min-width:640px){.bp-wrap{flex-direction:row!important}.bp-left{width:300px!important;border-right:1px solid #1a1810!important;border-bottom:none!important;padding:40px 28px!important}.bp-steps{flex-direction:column!important;overflow-x:visible!important;gap:14px!important}}
+        @keyframes bpPulse{0%,100%{opacity:.5}50%{opacity:1}}
+      `}</style>
+      <div className="bp-wrap" style={{ display:"flex", flex:1, overflow:"hidden", flexDirection:"column" }}>
+      {/* Left/Top: progress */}
+      <div className="bp-left" style={{ background: "#0a0a08", borderBottom: "1px solid #1a1810", display: "flex", flexDirection: "column", padding: "18px 16px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 48 }}>
           <div style={{ width: 30, height: 30, borderRadius: 7, background: "linear-gradient(135deg,#c8a96e,#a07840)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, color: "#0a0a08" }}>S</div>
           <span style={{ fontWeight: 800, fontSize: 16, color: "#e8e0d0" }}>Site<span style={{ color: "#c8a96e" }}>craft</span></span>
         </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Building your site</div>
-        <div style={{ fontSize: 24, fontWeight: 800, color: "#e8e0d0", marginBottom: 32, letterSpacing: -0.5 }}>{Math.floor(elapsed / 1000)}s elapsed</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:"#555", letterSpacing:"0.1em", textTransform:"uppercase" }}>Building</div>
+          <div style={{ fontSize:13, fontWeight:800, color:"#e8e0d0", marginLeft:"auto" }}>{Math.floor(elapsed / 1000)}s</div>
+        </div>
+        <div style={{ height:3, background:"#1a1810", borderRadius:2, overflow:"hidden", marginBottom:12 }}>
+          <div style={{ height:"100%", width:`${(step/(BUILD_STEPS.length-1))*100}%`, background:"linear-gradient(90deg,#c8a96e,#a07840)", transition:"width 1.5s ease" }}/>
+        </div>
+        <div className="bp-steps" style={{ display:"flex", gap:8, overflowX:"auto", flexDirection:"row" }}>
           {BUILD_STEPS.map((s, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, opacity: i <= step ? 1 : 0.25, transition: "opacity 0.6s" }}>
-              <div style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: i < step ? "#c8a96e" : i === step ? "#1a1810" : "#0f0e0b", border: `1px solid ${i <= step ? "#c8a96e44" : "#1a1810"}`, transition: "all 0.4s" }}>
-                {i < step ? "✓" : i === step ? <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#c8a96e", animation: "pulse 1s ease-in-out infinite" }} /> : null}
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0, opacity:i<=step?1:0.2, transition:"opacity 0.6s", background:i===step?"#111009":"transparent", borderRadius:20, padding:"4px 10px", border:`1px solid ${i===step?"#c8a96e33":"transparent"}` }}>
+              <div style={{ width:16, height:16, borderRadius:"50%", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, background:i<step?"#c8a96e":i===step?"#1a1810":"#0f0e0b", border:`1px solid ${i<=step?"#c8a96e44":"#1a1810"}` }}>
+                {i < step ? "✓" : i === step ? <div style={{ width:5, height:5, borderRadius:"50%", background:"#c8a96e", animation:"bpPulse 1s ease-in-out infinite" }}/> : null}
               </div>
-              <span style={{ fontSize: 13, fontWeight: i === step ? 600 : 400, color: i === step ? "#e8e0d0" : "#666" }}>{s.label}</span>
+              <span style={{ fontSize:11, fontWeight:i===step?600:400, color:i===step?"#e8e0d0":"#555", whiteSpace:"nowrap" }}>{s.label}</span>
             </div>
           ))}
         </div>
-        <div style={{ marginTop: "auto", paddingTop: 32 }}>
-          <div style={{ height: 3, background: "#1a1810", borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${(step / (BUILD_STEPS.length - 1)) * 100}%`, background: "linear-gradient(90deg,#c8a96e,#a07840)", borderRadius: 2, transition: "width 1.5s ease" }} />
-          </div>
-          <div style={{ fontSize: 11, color: "#444", marginTop: 8 }}>{Math.round((step / (BUILD_STEPS.length - 1)) * 100)}% complete</div>
         </div>
       </div>
 
@@ -140,7 +145,7 @@ function BuildProgress({ streamingHtml }: { streamingHtml: string }) {
           )}
         </div>
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:0.5}50%{opacity:1}}`}</style>
+      </div>
     </div>
   );
 }
@@ -257,7 +262,10 @@ export default function Home() {
     .style-card { border-radius:10px;overflow:hidden;cursor:pointer;transition:all 0.15s;border:2px solid transparent;flex-shrink:0; }
     .style-card.active { border-color:#c8a96e; }
     .style-card:hover:not(.active) { transform:scale(1.03); }
-    @media(max-width:640px) { .hide-mobile { display:none !important; } }
+    @media(max-width:640px){.hide-mobile{display:none!important}}
+    @media(min-width:641px){.show-mobile{display:none!important}}
+    /* Mobile input zoom prevention */
+    input,textarea,select{font-size:16px!important}
   `;
 
   // ── BUILDING ──────────────────────────────────────────────────────────────
@@ -273,16 +281,16 @@ export default function Home() {
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#070706" }}>
       <style>{CSS}</style>
       {/* Topbar */}
-      <div style={{ height: 54, background: "#0a0a08", borderBottom: "1px solid #1a1810", display: "flex", alignItems: "center", padding: "0 16px", gap: 12, flexShrink: 0, animation: "fadeUp 0.4s ease" }}>
+      <div style={{ height: 52, background: "#0a0a08", borderBottom: "1px solid #1a1810", display: "flex", alignItems: "center", padding: "0 14px", gap: 10, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 24, height: 24, borderRadius: 5, background: "linear-gradient(135deg,#c8a96e,#a07840)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 11, color: "#0a0a08" }}>S</div>
           <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: -0.3 }}>Site<span style={{ color: "#c8a96e" }}>craft</span></span>
         </div>
         <div style={{ width: 1, height: 20, background: "#1a1810" }} />
-        <div style={{ fontSize: 13, color: "#888", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{businessName}</div>
+        <div style={{ fontSize: 13, color: "#888", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{businessName}</div>
         <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-          <button className="btn-ghost" style={{ padding: "7px 14px" }} onClick={() => { setStep("input"); setInput(""); setPreviewHtml(""); }}>← Start over</button>
-          <button className="btn-gold" style={{ padding: "9px 18px" }} onClick={() => router.push("/build")}>Open Editor →</button>
+          <button className="btn-ghost" style={{ padding: "7px 12px", fontSize:13 }} onClick={() => { setStep("input"); setInput(""); setPreviewHtml(""); }}>← Back</button>
+          <button className="btn-gold" style={{ padding: "9px 14px", fontSize:13 }} onClick={() => router.push("/build")}>Edit →</button>
         </div>
       </div>
       {/* Preview frame */}
@@ -290,14 +298,13 @@ export default function Home() {
         <iframe ref={iframeRef} style={{ width: "100%", height: "100%", border: "none", animation: "fadeUp 0.5s ease 0.2s both" }} title="preview" sandbox="allow-scripts allow-same-origin allow-forms" />
       </div>
       {/* Bottom bar */}
-      <div style={{ height: 56, background: "rgba(10,10,8,0.97)", borderTop: "1px solid #1a1810", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", backdropFilter: "blur(12px)", flexShrink: 0 }}>
-        <div>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>Your site is ready.</span>
-          <span style={{ fontSize: 12, color: "#555", marginLeft: 8 }}>Open the editor to customise it, then publish.</span>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn-ghost" style={{ padding: "8px 16px" }} onClick={handleBuild}>↺ Regenerate</button>
-          <button className="btn-gold" style={{ padding: "10px 22px", fontSize: 15 }} onClick={() => router.push("/build")}>Customise & Publish →</button>
+      <div style={{ background: "rgba(10,10,8,0.97)", borderTop: "1px solid #1a1810", padding: "12px 16px", backdropFilter: "blur(12px)", flexShrink: 0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 600, flex:1 }}>Your site is ready.</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn-ghost" style={{ padding: "8px 14px", fontSize:13 }} onClick={handleBuild}>↺ Regen</button>
+            <button className="btn-gold" style={{ padding: "10px 18px", fontSize: 14 }} onClick={() => router.push("/build")}>Edit & Publish →</button>
+          </div>
         </div>
       </div>
     </div>
@@ -316,7 +323,7 @@ export default function Home() {
 
   // ── ONBOARD ───────────────────────────────────────────────────────────────
   if (step === "onboard") return (
-    <div style={{ minHeight: "100vh", background: "#070706", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100svh", background: "#070706", display: "flex", flexDirection: "column" }}>
       <style>{CSS}</style>
       {/* Nav */}
       <nav style={{ height: 56, display: "flex", alignItems: "center", padding: "0 24px", borderBottom: "1px solid #1a1810" }}>
