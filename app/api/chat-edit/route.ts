@@ -107,7 +107,7 @@ Return ONLY valid JSON with the updated complete HTML.`;
           let fullText = "";
           try {
             const stream = await client.messages.stream({
-              model: "claude-opus-4-5",
+              model: "claude-opus-4-7",
               max_tokens: 16000,
               system: SYSTEM_PROMPT,
               messages: conversationMessages,
@@ -168,7 +168,7 @@ Return ONLY valid JSON with the updated complete HTML.`;
 
     // ── Non-streaming fallback ──────────────────────────────────────────────
     const response = await client.messages.create({
-      model: "claude-opus-4-5",
+      model: "claude-opus-4-7",
       max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: conversationMessages,
