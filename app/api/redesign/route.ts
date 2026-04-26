@@ -1244,16 +1244,6 @@ export async function POST(req: NextRequest) {
       aiPowered: source === "claude",
       persistedToRedis: isRedisConfigured(),
     });
-      previewUrl: `/preview/${slug}`,
-      previewHtml: html,       // blob URL instant display — frontend uses this first
-      businessName: data.businessName,
-      slug,
-      copy,
-      source,
-      fallbackReason: reason ?? null,
-      aiPowered: source === "claude",
-      persistedToRedis: isRedisConfigured(),
-    });
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
