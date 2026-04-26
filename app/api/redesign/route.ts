@@ -225,7 +225,7 @@ Return ONLY this JSON structure (no markdown, no wrapper):
 Write exactly ${Math.max((Array.isArray(data.services) ? data.services : []).filter(s => typeof s === "string" && s.length > 3).length, 3)} service objects. If fewer than 3 services were found, invent the most likely core features/offerings for a ${vertical.label}.`;
 
   const message = await client.messages.create({
-    model: "claude-opus-4-5",
+    model: "claude-opus-4-7",
     max_tokens: 1000,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
