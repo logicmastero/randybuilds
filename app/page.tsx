@@ -33,7 +33,7 @@ const DESIGN_STYLES = [
 function StreamingCode({ html }: { html: string }) {
   const [displayed, setDisplayed] = useState("");
   const [cursor, setCursor] = useState(true);
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
   const iRef = useRef(0);
 
   useEffect(() => {
