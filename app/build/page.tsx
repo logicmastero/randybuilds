@@ -97,6 +97,8 @@ export default function BuilderPage() {
 
   // Modals
   const [showPublish, setShowPublish] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [publishSlug, setPublishSlug] = useState("");
   const [shareUrl, setShareUrl] = useState("");
@@ -262,10 +264,10 @@ export default function BuilderPage() {
   const cssVars = extractCSSVars(site.html);
 
   const S = {
-    root: { display: "flex", flexDirection: "column" as const, height: "100vh", background: "#070706", color: "#e8e0d0", fontFamily: "'Inter',-apple-system,sans-serif", overflow: "hidden" },
+    root: { display: "flex", flexDirection: "column" as const, height: "100svh", background: "#070706", color: "#e8e0d0", fontFamily: "'Inter',-apple-system,sans-serif", overflow: "hidden" },
     topbar: { height: 48, flexShrink: 0, background: "#0a0a08", borderBottom: "1px solid #111", display: "flex", alignItems: "center", gap: 8, padding: "0 12px" },
     body: { flex: 1, display: "flex", overflow: "hidden" },
-    sidebar: (open: boolean) => ({ width: open ? 220 : 0, flexShrink: 0, background: "#0a0a08", borderRight: "1px solid #111", overflow: "hidden", transition: "width 0.2s", display: "flex", flexDirection: "column" as const }),
+    sidebar: (open: boolean) => ({ width: open ? 220 : 0, flexShrink: 0, background: "#0a0a08", borderRight: "1px solid #111", overflow: "hidden", transition: "width 0.2s", display: "flex", flexDirection: "column" as const, position: "relative" as const }),
     center: { flex: 1, display: "flex", flexDirection: "column" as const, overflow: "hidden", background: "#070706" },
     right: (open: boolean) => ({ width: open ? 340 : 0, flexShrink: 0, background: "#0a0a08", borderLeft: "1px solid #111", display: "flex", flexDirection: "column" as const, overflow: "hidden", transition: "width 0.2s" }),
     tabBar: { display: "flex", gap: 0, borderBottom: "1px solid #111", flexShrink: 0 },
@@ -297,6 +299,25 @@ export default function BuilderPage() {
         @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
         @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
         @keyframes slideIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+        @keyframes slideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+        /* Mobile */
+        @media(max-width:640px){
+          .sc-left-panel{display:none!important}
+          .sc-right-panel{display:none!important}
+          .sc-desktop-only{display:none!important}
+          .sc-mobile-fab{display:flex!important}
+          .sc-mobile-sheet{display:flex!important}
+        }
+        @media(min-width:641px){
+          .sc-mobile-only{display:none!important}
+          .sc-mobile-fab{display:none!important}
+        }
+        .sc-mobile-fab{display:none;position:fixed;bottom:20px;right:16px;gap:10px;z-index:80}
+        .sc-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:90;backdrop-filter:blur(4px)}
+        .sc-bottom-sheet{position:fixed;bottom:0;left:0;right:0;background:#0a0a08;border-top:1px solid #1a1810;border-radius:20px 20px 0 0;z-index:100;animation:slideUp .25s ease;max-height:85svh;display:flex;flex-direction:column;overflow:hidden}
+        .sc-sheet-handle{width:36px;height:4px;background:#222;border-radius:2px;margin:12px auto 4px}
+        .chat-ta{font-size:16px!important}
+        input,select{font-size:16px!important}
       `}</style>
 
       {/* ── TOPBAR ── */}
