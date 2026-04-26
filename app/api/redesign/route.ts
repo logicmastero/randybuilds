@@ -1194,12 +1194,12 @@ export async function POST(req: NextRequest) {
     const { copy, source, reason } = await generateRedesignCopy(data);
     const html = buildPreviewHTML(data, copy, source);
     const htmlWithMobileMenu = injectMobileMenu(html, data.colors?.[0] || "#3b82f6");
+    const slug = generateSlug(data.businessName);
     
     // Inject analytics tracking script
     const analyticsScript = getAnalyticsScript(slug);
     const analyticsTag = `<script>${analyticsScript}</script>`;
     const htmlWithAnalytics = htmlWithMobileMenu.replace("</body>", `${analyticsTag}</body>`);
-    const slug = generateSlug(data.businessName);
 
     console.log(`[redesign] Saving preview slug="${slug}" source="${source}" redis=${isRedisConfigured()}`);
 
