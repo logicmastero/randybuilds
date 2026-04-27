@@ -191,7 +191,7 @@ export default function Home() {
       const res = await fetch("/api/chat-edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMsg, currentHtml, businessName: biz, history: historyRef.current.slice(-8) }),
+        body: JSON.stringify({ message: userMsg, currentHtml, businessName: biz, history: historyRef.current.slice(-8), isInitialBuild: !currentHtml || currentHtml.trim() === "" }),
       });
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
