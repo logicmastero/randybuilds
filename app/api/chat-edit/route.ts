@@ -1,71 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { injectThemeToggle } from "@/lib/theme-injector";
-import { injectSEOMeta } from "@/lib/seo-injector";
 import { injectEmailCaptureForm } from "@/lib/form-injector";
 
 export const maxDuration = 60;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const BUILD_PROMPT = `You are an expert web designer. Build a complete, premium single-page website.
+// Only model confirmed working on this account
+const MODEL = "claude-haiku-4-5-20251001";
 
-ALWAYS return a full HTML document using EXACTLY this format — nothing before or after:
+const BUILD_PROMPT = `You are an expert web designer. Build a complete premium single-page website.
+
+Return your response in EXACTLY this format with no text before or after:
 
 <<<HTML>>>
-<!DOCTYPE html>
-<html lang="en">
-...complete site...
-</html>
+[complete <!DOCTYPE html> document]
 <<<END>>>
 <<<MSG>>>
-One sentence describing what you built.
+[one sentence: what you built]
 <<<END_MSG>>>
 <<<BIZ>>>
-Business name extracted from the prompt
+[business name]
 <<<END_BIZ>>>
 
-SITE REQUIREMENTS — always include ALL of these:
-1. Sticky nav with logo + links + phone number + mobile hamburger (working JS)
-2. Full-height hero (100svh) — bold headline speaking to customer pain, 2 CTAs, trust badge
-3. Trust bar — 4-5 signals (years, customers, certifications, guarantee)
-4. Services section — 3-6 cards with emoji icons, inferred from business type
-5. How it works — 3 numbered steps
-6. Testimonials — 3 detailed reviews (name, city, ★★★★★, 3-sentence quote)
-7. FAQ accordion — 5 questions (working JS expand/collapse)
-8. Contact section — form (name, phone, email, service dropdown, message, submit) + hours + address
-9. Footer — logo, links, contact, social placeholders, copyright
+SITE MUST INCLUDE ALL OF THESE SECTIONS:
+1. Fixed nav: logo left, links right, phone number, working mobile hamburger menu (JS toggle)
+2. Hero: 100svh, bold headline targeting customer pain point, 2 CTAs, floating trust badge
+3. Trust bar: 4-5 icons + labels (years in business, customers served, guarantee, etc)
+4. Services: 3-6 cards with emoji icons, real descriptions inferred from the business type
+5. How it works: 3 numbered steps showing customer journey
+6. Testimonials: 3 reviews (name, city, ★★★★★ rating, 3-sentence specific quote)
+7. FAQ: 5 questions with working JS accordion (click to expand/collapse)
+8. Contact: form (name, phone, email, service dropdown, message, submit button that shows success), address, hours
+9. Footer: logo, quick links, contact info, social placeholders, copyright
 
-DESIGN:
-- Google Fonts: Instrument Serif (headings) + Inter (body)
-- Pick color palette based on industry (trades=dark navy+orange, travel=deep blue+gold, health=white+sage, etc)
-- Mobile-responsive, hover states, smooth scroll
-- Real copy — NO Lorem ipsum. Write actual headlines and content for this specific business.
-- Hamburger menu JS must work. FAQ accordion JS must work. Form shows success message on submit.`;
+DESIGN RULES:
+- Google Fonts: Instrument Serif (headings) + Inter (body) via <link> tag
+- Choose palette based on industry: trades=dark navy+orange, travel=deep ocean blue+gold, health=white+sage, restaurant=dark+amber, default=charcoal #111+gold #c8a96e
+- Mobile responsive (works on iPhone)
+- smooth-scroll, hover effects on all interactive elements
+- Mobile menu JS: toggle a class on click, hide/show nav links
+- FAQ accordion JS: toggle visibility on click
+- Form submit JS: prevent default, show "Thank you! We'll be in touch soon." message
+- Write REAL copy for this specific business — no Lorem ipsum, no placeholder headlines`;
 
-const EDIT_PROMPT = `You are an expert web designer editing a live website via chat.
+const EDIT_PROMPT = `You are an expert web designer. Edit the website based on the user's request.
 
-Make EXACTLY what the user asked. Preserve everything else. Return the COMPLETE updated HTML document.
+Make exactly what was asked. Preserve everything else. Return the COMPLETE updated HTML document.
 
-Use EXACTLY this format:
+Return in EXACTLY this format:
 <<<HTML>>>
-<!DOCTYPE html>
-...complete updated site...
-</html>
+[complete <!DOCTYPE html> document]
 <<<END>>>
 <<<MSG>>>
-One sentence about what changed.
+[one sentence about what changed]
 <<<END_MSG>>>
 <<<BIZ>>>
-Business name (unchanged)
+[business name unchanged]
 <<<END_BIZ>>>`;
 
-function extract(raw: string, businessName: string) {
+function extract(raw: string, fallbackBiz: string) {
   let html = "";
-  let msg = "Done! What would you like to change next?";
-  let biz = businessName;
+  let msg = "Done! What would you like to change?";
+  let biz = fallbackBiz;
 
-  // Primary: custom delimiters
   const htmlMatch = raw.match(/<<<HTML>>>([\s\S]*?)<<<END>>>/);
   if (htmlMatch) html = htmlMatch[1].trim();
 
@@ -102,16 +101,19 @@ export async function POST(req: NextRequest) {
       for (const m of (history as {role:"user"|"assistant";content:string}[]).slice(-4)) {
         messages.push({ role: m.role, content: m.content });
       }
+      messages.push({
+        role: "user",
+        content: `Current HTML:\n\`\`\`html\n${currentHtml.slice(0, 10000)}\n\`\`\`\n\nBusiness: ${businessName}\n\nRequest: ${message}`,
+      });
+    } else {
+      messages.push({
+        role: "user",
+        content: `Build a complete premium website for this business: "${message}"\n\nInfer the industry, services, location tone, and design style. Write real copy. Make it look like a $10k agency built it.`,
+      });
     }
 
-    const userContent = isNew
-      ? `Business: ${message}\n\nBuild a full premium website for this business. Infer everything — services, copy, design style, location tone. Make it look like a $10k agency job.`
-      : `Current HTML:\n\`\`\`html\n${currentHtml.slice(0, 12000)}\n\`\`\`\n\nBusiness: ${businessName}\n\nRequest: ${message}`;
-
-    messages.push({ role: "user", content: userContent });
-
     const response = await client.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: MODEL,
       max_tokens: 8000,
       system: systemPrompt,
       messages,
@@ -121,29 +123,19 @@ export async function POST(req: NextRequest) {
     const { html, msg, biz } = extract(rawText, businessName);
 
     if (!html) {
-      console.error("[chat-edit] No HTML in response. Raw:", rawText.slice(0, 300));
-      return NextResponse.json({ error: "No HTML generated. Please try again." }, { status: 500 });
+      console.error("[chat-edit] No HTML extracted. Raw start:", rawText.slice(0, 400));
+      return NextResponse.json({ error: "Generation failed — please try again." }, { status: 500 });
     }
 
     let finalHtml = html;
     try { finalHtml = injectThemeToggle(finalHtml); } catch { /* non-fatal */ }
     try { finalHtml = injectEmailCaptureForm(finalHtml, { autoTriggerDelay: 4000 }); } catch { /* non-fatal */ }
-    if (seo) {
-      try {
-        finalHtml = injectSEOMeta(finalHtml, {
-          title: seo.title || businessName,
-          description: seo.description || "",
-          businessName: seo.businessName || businessName,
-          businessType: seo.businessType || "Organization",
-        });
-      } catch { /* non-fatal */ }
-    }
 
     return NextResponse.json({ html: finalHtml, message: msg, businessName: biz });
 
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[chat-edit]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("[chat-edit] Error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
