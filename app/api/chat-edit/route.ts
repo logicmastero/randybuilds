@@ -131,7 +131,7 @@ Return the complete updated HTML in the required delimiter format.`;
     conversationMessages.push({ role: "user", content: userContent });
 
     const response = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-opus-4-7",
       max_tokens: 12000,
       system: SYSTEM_PROMPT,
       messages: conversationMessages,
