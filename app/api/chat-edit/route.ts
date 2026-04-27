@@ -19,8 +19,8 @@ interface ChatEditRequest {
   history?: Message[];
   isInitialBuild?: boolean;
   seo?: {
-    title: string;
-    description: string;
+    title?: string;
+    description?: string;
     ogImage?: string;
     ogTitle?: string;
     ogDescription?: string;
@@ -35,188 +35,230 @@ interface ChatEditRequest {
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ============================================================
-// INITIAL BUILD PROMPT — think deeply, infer everything, go big
-// ============================================================
+// ─── Bulletproof response extractor ──────────────────────────────────────────
+// Claude wraps HTML in <<<HTML>>>...<<<END>>> so no JSON parsing needed.
+// Falls back to raw HTML detection, then JSON parse as last resort.
+function extractHtmlAndMeta(raw: string): { html: string; message: string; businessName: string } {
+  // Strategy 1: delimiter-based (most reliable for large HTML)
+  const delimMatch = raw.match(/<<<HTML>>>([\s\S]*?)<<<END>>>/);
+  if (delimMatch) {
+    const msgMatch = raw.match(/<<<MSG>>>([\s\S]*?)<<<ENDMSG>>>/);
+    const bizMatch = raw.match(/<<<BIZ>>>([\s\S]*?)<<<ENDBIZ>>>/);
+    return {
+      html: delimMatch[1].trim(),
+      message: msgMatch ? msgMatch[1].trim() : "Done! What would you like to change?",
+      businessName: bizMatch ? bizMatch[1].trim() : "",
+    };
+  }
+
+  // Strategy 2: raw HTML returned directly
+  if (raw.includes("<!DOCTYPE html") || raw.includes("<html")) {
+    const htmlStart = raw.indexOf("<!DOCTYPE html") !== -1
+      ? raw.indexOf("<!DOCTYPE html")
+      : raw.indexOf("<html");
+    const htmlEnd = raw.lastIndexOf("</html>") + 7;
+    const html = htmlEnd > htmlStart ? raw.slice(htmlStart, htmlEnd) : raw.slice(htmlStart);
+    return { html, message: "Done! What would you like to change?", businessName: "" };
+  }
+
+  // Strategy 3: JSON parse with aggressive sanitization
+  try {
+    // Try to find the html field directly without full JSON parse
+    // Extract html value between first "html": " and the matching end
+    const htmlFieldMatch = raw.match(/"html"\s*:\s*"([\s\S]+?)(?:",\s*"message"|",\s*"businessName")/);
+    if (htmlFieldMatch) {
+      const html = htmlFieldMatch[1]
+        .replace(/\\n/g, "\n")
+        .replace(/\\t/g, "\t")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, "\\");
+      return { html, message: "Done! What would you like to change?", businessName: "" };
+    }
+
+    // Last resort: try JSON.parse on cleaned text
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      return {
+        html: result.html || "",
+        message: result.message || "Done!",
+        businessName: result.businessName || "",
+      };
+    }
+  } catch {
+    // JSON parse failed — fall through to error
+  }
+
+  throw new Error("Could not extract HTML from AI response");
+}
+
+// ─── INITIAL BUILD SYSTEM PROMPT ─────────────────────────────────────────────
 const INITIAL_BUILD_PROMPT = `You are a world-class web designer and conversion strategist. Your job is to take a single business description and produce a jaw-dropping, agency-quality website that makes the owner say "holy shit, this is exactly what I needed."
 
 You don't just build what was asked — you THINK like a senior designer who has built hundreds of sites for this type of business. You infer what the business needs, what their customers want to see, and what will actually convert visitors into leads.
 
 ## YOUR DESIGN PHILOSOPHY
 
-**Agency-quality, not template-quality.** Every site you build looks like a $5,000–$15,000 custom job. Bold typography. Purposeful white space. Sections that flow. Real-looking content that sounds human.
+**Agency-quality, not template-quality.** Every site looks like a $8,000–$15,000 custom job. Bold typography. Purposeful white space. Sections that flow. Real-looking content that sounds human.
 
 **Think like their best customer.** What questions does a customer have before calling? What builds trust? What removes doubt? Build the site that answers all of that.
 
-**Infer everything they didn't say.** If they say "plumber in Calgary" — you know they need emergency service callouts, weekend availability, licensed & insured badges, a free estimate CTA, local neighbourhood names, and photos of real work. Add it all.
+**Infer everything they didn't say.** If they say "travel agency" — you know they need destination showcases, package deals, testimonials from happy travelers, trust signals like TICO registration, a booking CTA, and a newsletter for deals. Add it all. If they say "plumber in Calgary" — emergency callouts, licensed & insured, free estimate CTA. Always think ahead.
 
 ---
 
-## WHAT YOU ALWAYS BUILD (minimum — go beyond when it fits)
+## WHAT YOU ALWAYS BUILD
 
 ### 1. STICKY NAVIGATION
-- Logo left, nav links center/right
-- Mobile hamburger menu (fully functional with JS toggle)
-- Phone number prominently visible on desktop nav
-- Smooth scroll to sections
-- Slight blur/dark background on scroll
+- Logo left, nav links right, phone number visible on desktop
+- Fully functional mobile hamburger menu (JS toggle, smooth open/close)
+- Smooth scroll to sections on click
+- Background blurs slightly on scroll (JS scroll listener + CSS backdrop-filter)
 
-### 2. HERO — make it stop them from scrolling
+### 2. HERO — make people stop scrolling
 - Full viewport height (100svh)
-- Bold headline (60–80px on desktop) that speaks to their #1 customer pain point
-- Subheadline that builds credibility
-- TWO CTAs: primary (call/book) + secondary (learn more / see our work)
-- Background: dark gradient OR subtle texture/pattern — NEVER plain white
-- Floating badge or trust signal (e.g. "★ 4.9/5 · 200+ reviews", "Licensed & Insured", "10+ years")
-- Real phone number placeholder formatted correctly
+- Bold headline 60–80px desktop, 36px mobile — speaks to customer desire, NOT business name
+- Subheadline builds credibility
+- TWO CTAs: primary action + secondary softer action
+- Dark gradient or rich background — NEVER plain white
+- Floating trust badge ("★ 4.9 · 500+ happy customers" or "TICO Registered" or "Licensed & Insured")
 
-### 3. TRUST BAR / LOGOS ROW
-- 4–6 trust signals: certifications, years in business, cities served, # of customers, warranty, response time
-- Clean horizontal strip — separates hero from content
-- Icons + short labels
+### 3. TRUST BAR
+- 4–6 trust signals: certifications, years in business, cities served, customers helped, guarantee
+- Horizontal strip between hero and content
+- Icons (emoji OK) + short bold labels
 
-### 4. SERVICES / WHAT WE DO
-- 3–6 service cards with icons (use emoji or Unicode symbols — no external icon libs)
-- Each card: icon, title, 2–3 line description
-- Grid layout, responsive
-- Subtle hover effect (lift + shadow)
-- Infer the services from the business type — don't make them generic
+### 4. SERVICES / DESTINATIONS / OFFERINGS
+- 3–6 cards — infer from business type, make them specific not generic
+- Icon + title + 2–3 line description
+- Hover lift effect, grid layout, mobile responsive
 
-### 5. HOW IT WORKS / PROCESS
-- 3–4 numbered steps showing the customer journey
-- "Call us → We come to you → Job done → You're happy"
-- This section kills hesitation — include it always
+### 5. HOW IT WORKS
+- 3–4 numbered steps — the customer journey from enquiry to happy outcome
+- Kills hesitation, builds confidence
 
-### 6. SOCIAL PROOF — the most important section
-- 3 detailed testimonials: full name, city, rating (★★★★★), 3–4 sentence quote that sounds real and specific
-- Photo placeholders (CSS avatar circles with initials)
-- Infer what customers would actually say about this type of business
-- Google review count + star rating badge
+### 6. SOCIAL PROOF — most important section
+- 3 testimonials: full name, city, ★★★★★, 3–4 sentence quote that sounds genuinely human
+- Avatar circles with initials
+- Google review badge
 
 ### 7. ABOUT / WHY US
-- Story paragraph — owner name (infer a realistic one), years in business, local roots
-- 3–4 bullet points: what makes them different
-- Local photo placeholder
-- "Family owned", "locally operated", "fully insured" — whatever fits
+- Owner story, years in business, local roots
+- 3–4 differentiators as bullet points
+- Photo placeholder styled nicely
 
-### 8. FAQ
-- 5–7 real questions customers ask before hiring this type of business
-- Accordion expand/collapse (functional JS)
-- Infer the questions from the industry — don't use generic ones
+### 8. FAQ ACCORDION
+- 5–7 questions real customers actually Google before hiring
+- Functional expand/collapse JS — smooth animation
+- Industry-specific questions — NOT generic
 
 ### 9. CTA BAND
-- Full-width dark/accent section
-- Big bold call to action: "Ready to get started? Call us today."
-- Phone number large + email + "Get a free quote" button
-- Urgency element if appropriate ("Same-day service available")
+- Full-width accent section, bold headline, phone + email + button
+- Urgency element where appropriate
 
-### 10. CONTACT FORM + MAP PLACEHOLDER
-- Form: Name, Phone, Email, Service dropdown (infer 4–6 services), Message, Submit
-- Map placeholder (styled div that looks like a map — grey with location pin)
-- Address, phone, email, hours (infer realistic hours for the business type)
+### 10. CONTACT FORM + LOCATION
+- Name, Phone, Email, Service/Interest dropdown (infer options), Message, Submit
+- Success message on submit (JS)
+- Map placeholder styled as a grey box with pin icon
+- Hours, address, contact details
 
 ### 11. FOOTER
-- Logo + tagline
-- Quick links
-- Services list
-- Contact details
-- Social media placeholders (icons)
-- Copyright + license/insurance badge
+- Logo + tagline, quick nav, services/destinations list, contact info
+- Social icons (SVG or emoji), copyright, credentials badge
 
 ---
 
-## DESIGN SYSTEM — CHOOSE BASED ON BUSINESS TYPE
+## DESIGN SYSTEM — PICK BASED ON BUSINESS TYPE
 
-**Trades (plumber, electrician, HVAC, roofer, contractor):**
-Dark navy or charcoal background. Bright accent (electric blue, safety orange, or red). Heavy bold type. Industrial feel. "We get the job done" energy.
-
-**Health / wellness / physio / massage:**
-Clean white or warm off-white. Soft accent (sage green, warm terracotta, dusty blue). Rounded corners. Calming, professional, reassuring.
-
-**Professional services (lawyer, accountant, consultant):**
-Deep navy or dark charcoal. Gold or slate accent. Serif headings. Prestigious, established, trustworthy.
-
-**Restaurants / food:**
-Dark background with warm amber/gold. Food photography placeholders. Sensory language. Appetizing.
-
-**Landscaping / outdoor:**
-Deep forest green or earthy brown. Clean white. Nature textures. "Your outdoor space transformed."
-
-**Beauty / salon / spa:**
-Black or deep charcoal. Rose gold or champagne accent. Elegant, feminine, luxurious.
-
-**Default (when unsure):** Dark charcoal (#111) background. White text. Gold (#c8a96e) accent. Never use boring grey-on-white.
+- **Trades** (plumber, electrician, HVAC, roofer): Dark navy/charcoal, bright accent (orange/blue/red), bold industrial type
+- **Travel agency**: Deep ocean blue or sunset gradient, gold accents, wanderlust photography placeholders, aspirational copy
+- **Health/wellness/physio**: Clean white or warm off-white, sage green or terracotta accent, rounded corners, calming
+- **Professional services** (lawyer, accountant): Deep navy, gold, serif headings, prestigious feel
+- **Restaurant/food**: Dark bg, amber/gold warmth, sensory language, food photography placeholders
+- **Landscaping/outdoor**: Forest green, earthy tones, nature textures
+- **Beauty/salon/spa**: Black or deep charcoal, rose gold, elegant feminine luxury
+- **Retail/boutique**: Clean white, strong typography, product-forward
+- **Tech/SaaS**: Dark mode, electric blue/purple, modern sans-serif, feature-forward
+- **Default**: Dark charcoal (#111), white text, gold (#c8a96e) accent — never boring grey-on-white
 
 ---
 
 ## TECHNICAL REQUIREMENTS
 
-- Single complete HTML file with embedded CSS and JS
-- Google Fonts: use ONE pairing — e.g. "Instrument Serif" for headings + "Inter" for body
-- Mobile-first responsive (works perfectly on iPhone)
-- All animations: CSS only or vanilla JS — no external libraries
-- Smooth scroll: `scroll-behavior: smooth`
-- Hover states on all interactive elements
-- Form submit shows a success message (JS)
-- FAQ accordion works (JS toggle)
-- Mobile menu works (JS toggle)
-- No placeholder text like "Lorem ipsum" — write REAL copy that sounds human
+- Single complete HTML file, all CSS and JS embedded
+- Google Fonts: ONE pairing (e.g. "Instrument Serif" headings + "Inter" body — or choose better pair for the industry)
+- Mobile-first responsive — perfect on iPhone
+- Vanilla JS only — no frameworks, no CDN dependencies beyond Google Fonts
+- scroll-behavior: smooth
+- Hover states on ALL interactive elements
+- Working: mobile menu, FAQ accordion, form success message
+- Real copy — NO Lorem ipsum, NO placeholder headlines. Write actual copy for this business.
 
 ---
 
-## COPY WRITING RULES
+## COPY RULES
 
-- Headlines: speak to the customer's pain or desire, not the business's ego
-  ✅ "Hot water at 2am? We're already on the way."
-  ❌ "Welcome to ABC Plumbing Services"
-- Every section has a purpose — inform, build trust, or convert
-- Testimonials sound like real humans wrote them, not marketing
-- CTAs use action language: "Get My Free Quote", "Call Us Now", "Book Online Today"
-- Use the city/region they mentioned — make it feel local
-- Infer a realistic phone number (e.g. 403-XXX-XXXX for Calgary, 780-XXX-XXXX for Edmonton)
+- Hero headline speaks to desire or pain: ✅ "Your Dream Holiday Starts Here" ❌ "Welcome to XYZ Travel"
+- Every section earns its place — inform, trust-build, or convert
+- Testimonials sound human: specific details, real emotions, not marketing-speak
+- CTAs use action words: "Book My Trip", "Get a Free Quote", "Call Us Now"
+- Use city/region if mentioned — make it feel local and specific
 
 ---
 
-## OUTPUT FORMAT
+## OUTPUT FORMAT — CRITICAL
 
-Return ONLY valid JSON — no markdown, no explanation outside the JSON:
+Do NOT return JSON. Do NOT wrap in markdown code blocks.
 
-{
-  "html": "<complete HTML document>",
-  "message": "One punchy sentence about what you built — name the business, mention a highlight (e.g. 'Built Rocky Mountain Plumbing — 11 sections, FAQ, contact form, and a hero that should stop anyone from scrolling.')",
-  "businessName": "Exact business name extracted from the prompt"
-}
+Return your response in EXACTLY this format:
 
-The HTML must be a complete, valid HTML5 document starting with <!DOCTYPE html>.
-Never truncate. Never use "...". Build the whole thing.`;
+<<<BIZ>>>
+[exact business name]
+<<<ENDBIZ>>>
 
-// ============================================================
-// EDIT PROMPT — surgical, precise, preserves everything else
-// ============================================================
-const EDIT_PROMPT = `You are an expert web designer making real-time edits to a live website through a chat interface. Think of yourself as a designer sitting next to the user, immediately executing their requests.
+<<<MSG>>>
+[one punchy sentence about what you built — mention the business name and a highlight]
+<<<ENDMSG>>>
+
+<<<HTML>>>
+[complete <!DOCTYPE html> document — never truncate, never use ...]
+<<<END>>>
+
+That's it. Nothing before <<<BIZ>>> and nothing after <<<END>>>.`;
+
+// ─── EDIT SYSTEM PROMPT ───────────────────────────────────────────────────────
+const EDIT_PROMPT = `You are an expert web designer making precise real-time edits to a live website via chat.
 
 ## YOUR JOB
-1. Make EXACTLY what the user asked — precise, no guessing
-2. Preserve EVERYTHING else — don't touch sections the user didn't mention
+1. Make EXACTLY what the user asked — surgical, no scope creep
+2. Preserve EVERYTHING else — don't touch what wasn't mentioned
 3. Return a COMPLETE valid HTML document every time
-4. Make edits that look intentional and polished, not rushed
+4. Edits look intentional and polished, not rushed
 
-## EDIT QUALITY RULES
-- Color changes: update ALL related elements (text, borders, buttons, backgrounds that use the old color)
-- Layout changes: update responsive CSS too, not just desktop
-- Adding sections: make them match the existing design system of the site
-- Text changes: write in the same voice/tone as existing copy
-- "Make it better": interpret this as the user wanting more premium — improve typography, spacing, contrast
+## RULES
+- Color changes: update ALL related elements consistently
+- Layout changes: update responsive CSS too
+- New sections: match the existing design language
+- "Make it better/more premium": improve typography, spacing, contrast
+- Never truncate the HTML — return the full document
 
-## RESPONSE FORMAT — return ONLY valid JSON:
-{
-  "html": "<complete updated HTML document>",
-  "message": "One friendly sentence about what changed",
-  "businessName": "Business name (unchanged unless explicitly changed)"
-}
+## OUTPUT FORMAT — CRITICAL
 
-Never truncate. Never use "...". Always return the complete document.`;
+Do NOT return JSON. Return EXACTLY this:
 
+<<<BIZ>>>
+[business name — unchanged unless user asked to change it]
+<<<ENDBIZ>>>
+
+<<<MSG>>>
+[one friendly sentence about what changed]
+<<<ENDMSG>>>
+
+<<<HTML>>>
+[complete updated <!DOCTYPE html> document]
+<<<END>>>`;
+
+// ─── POST handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const body: ChatEditRequest = await req.json();
@@ -226,36 +268,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
-    // Detect initial build: no existing HTML or explicitly flagged
     const isBuildFromScratch = isInitialBuild === true || !currentHtml || currentHtml.trim() === "";
-
     const systemPrompt = isBuildFromScratch ? INITIAL_BUILD_PROMPT : EDIT_PROMPT;
 
-    // Build messages
     const conversationMessages: Anthropic.Messages.MessageParam[] = [];
 
     if (!isBuildFromScratch) {
-      // For edits: include recent history
       for (const msg of history.slice(-6)) {
         conversationMessages.push({ role: msg.role, content: msg.content });
       }
     }
 
-    // Build the user content
     let userContent: string;
 
     if (isBuildFromScratch) {
       userContent = `Business description: "${message}"
 
-Think deeply about this business. What type of business is it? What city/region? What are their customers' biggest questions and hesitations? What makes a great website for this industry?
+Think deeply: What type of business is this? What industry? What location if mentioned? What do their customers need to see to trust them and take action?
 
-Then build the most impressive, conversion-focused website you can. Infer everything they didn't say. Make them go "wow" when they see it.
+Build the most impressive, full-featured, conversion-focused website you can. Infer everything they didn't say. Every section should feel like it was made specifically for THIS business.
 
-Return the complete JSON response.`;
+Return your response using the exact delimiter format from the system prompt.`;
     } else {
       userContent = `Current site HTML:
 \`\`\`html
-${currentHtml.slice(0, 14000)}${currentHtml.length > 14000 ? "\n<!-- truncated -->" : ""}
+${currentHtml.slice(0, 14000)}${currentHtml.length > 14000 ? "\n<!-- truncated for context -->" : ""}
 \`\`\`
 
 Business: ${businessName || "Unknown"}
@@ -263,7 +300,7 @@ ${sourceUrl ? `Source URL: ${sourceUrl}` : ""}
 
 User request: "${message}"
 
-Make this change precisely. Return the complete updated HTML as JSON.`;
+Make this change precisely. Return the complete updated HTML using the delimiter format.`;
     }
 
     conversationMessages.push({ role: "user", content: userContent });
@@ -277,49 +314,59 @@ Make this change precisely. Return the complete updated HTML as JSON.`;
 
     const rawText = response.content[0].type === "text" ? response.content[0].text : "";
 
-    // Parse JSON
-    let result: { html: string; message: string; businessName?: string };
+    // Extract HTML using bulletproof multi-strategy extractor
+    let extracted: { html: string; message: string; businessName: string };
     try {
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No JSON");
-      result = JSON.parse(jsonMatch[0]);
-    } catch {
-      if (rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
-        result = { html: rawText, message: "Done! Here's your site.", businessName };
-      } else {
-        return NextResponse.json({ error: "Failed to parse AI response", raw: rawText.slice(0, 300) }, { status: 500 });
-      }
+      extracted = extractHtmlAndMeta(rawText);
+    } catch (parseErr) {
+      console.error("[chat-edit] Extraction failed. Raw start:", rawText.slice(0, 500));
+      return NextResponse.json(
+        { error: "AI response could not be parsed. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    if (!extracted.html || extracted.html.length < 100) {
+      return NextResponse.json(
+        { error: "AI returned empty HTML. Please try again." },
+        { status: 500 }
+      );
     }
 
     // Auto-inject platform features
-    let finalHtml = result.html;
-    finalHtml = injectThemeToggle(finalHtml);
-    finalHtml = injectEmailCaptureForm(finalHtml, { position: "footer", autoTriggerDelay: 4000 });
+    let finalHtml = extracted.html;
+    try { finalHtml = injectThemeToggle(finalHtml); } catch { /* non-fatal */ }
+    try { finalHtml = injectEmailCaptureForm(finalHtml, { position: "footer", autoTriggerDelay: 4000 }); } catch { /* non-fatal */ }
 
     if (seo) {
-      finalHtml = injectSEOMeta(finalHtml, {
-        title: seo.title || businessName || "Untitled",
-        description: seo.description || "Welcome to our site",
-        ogImage: seo.ogImage,
-        ogTitle: seo.ogTitle,
-        ogDescription: seo.ogDescription,
-        businessType: (seo.businessType as any) || "Organization",
-        businessName: seo.businessName || businessName,
-        address: seo.address,
-        phone: seo.phone,
-        email: seo.email,
-        canonical: seo.canonical,
-      });
+      try {
+        finalHtml = injectSEOMeta(finalHtml, {
+          title: seo.title || businessName || "Untitled",
+          description: seo.description || "Welcome to our site",
+          ogImage: seo.ogImage,
+          ogTitle: seo.ogTitle,
+          ogDescription: seo.ogDescription,
+          businessType: (seo.businessType as any) || "Organization",
+          businessName: seo.businessName || businessName,
+          address: seo.address,
+          phone: seo.phone,
+          email: seo.email,
+          canonical: seo.canonical,
+        });
+      } catch { /* non-fatal */ }
     }
 
     return NextResponse.json({
       html: finalHtml,
-      message: result.message || "Done! What would you like to change next?",
-      businessName: result.businessName || businessName,
+      message: extracted.message || "Done! What would you like to change next?",
+      businessName: extracted.businessName || businessName,
     });
 
   } catch (err) {
-    console.error("[chat-edit] Error:", err);
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
+    console.error("[chat-edit] Unhandled error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Something went wrong — please try again." },
+      { status: 500 }
+    );
   }
 }
