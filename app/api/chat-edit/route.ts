@@ -6,87 +6,42 @@ import { injectEmailCaptureForm } from "@/lib/form-injector";
 export const maxDuration = 60;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// Only model confirmed working on this account
 const MODEL = "claude-haiku-4-5-20251001";
 
-const BUILD_PROMPT = `You are an expert web designer. Build a complete premium single-page website.
+const BUILD_PROMPT = `You are an expert web designer. Build a complete, beautiful single-page website.
 
-Return your response in EXACTLY this format with no text before or after:
+IMPORTANT: Return ONLY the raw HTML document. No explanation. No markdown. No code blocks. Just the HTML.
 
-<<<HTML>>>
-[complete <!DOCTYPE html> document]
-<<<END>>>
-<<<MSG>>>
-[one sentence: what you built]
-<<<END_MSG>>>
-<<<BIZ>>>
-[business name]
-<<<END_BIZ>>>
+Start your response with <!DOCTYPE html> and end with </html>.
 
-SITE MUST INCLUDE ALL OF THESE SECTIONS:
-1. Fixed nav: logo left, links right, phone number, working mobile hamburger menu (JS toggle)
-2. Hero: 100svh, bold headline targeting customer pain point, 2 CTAs, floating trust badge
-3. Trust bar: 4-5 icons + labels (years in business, customers served, guarantee, etc)
-4. Services: 3-6 cards with emoji icons, real descriptions inferred from the business type
-5. How it works: 3 numbered steps showing customer journey
-6. Testimonials: 3 reviews (name, city, ★★★★★ rating, 3-sentence specific quote)
-7. FAQ: 5 questions with working JS accordion (click to expand/collapse)
-8. Contact: form (name, phone, email, service dropdown, message, submit button that shows success), address, hours
-9. Footer: logo, quick links, contact info, social placeholders, copyright
+The site MUST include:
+- Fixed navigation: logo, links, phone number, working mobile hamburger (JS)
+- Hero: bold headline about customer pain, subtext, 2 CTA buttons, trust badge
+- Services: 3-4 cards with emoji icons
+- Testimonials: 3 reviews with name, city, 5 stars, quote
+- FAQ: 4 questions, working accordion (JS)
+- Contact form: name, phone, email, message, submit (shows success on JS submit)
+- Footer: logo, links, copyright
 
-DESIGN RULES:
-- Google Fonts: Instrument Serif (headings) + Inter (body) via <link> tag
-- Choose palette based on industry: trades=dark navy+orange, travel=deep ocean blue+gold, health=white+sage, restaurant=dark+amber, default=charcoal #111+gold #c8a96e
-- Mobile responsive (works on iPhone)
-- smooth-scroll, hover effects on all interactive elements
-- Mobile menu JS: toggle a class on click, hide/show nav links
-- FAQ accordion JS: toggle visibility on click
-- Form submit JS: prevent default, show "Thank you! We'll be in touch soon." message
-- Write REAL copy for this specific business — no Lorem ipsum, no placeholder headlines`;
+Design:
+- Google Fonts: Instrument Serif (headings) + Inter (body)
+- Strong color palette matching the industry (travel=deep blue+gold, trades=navy+orange, health=white+sage, default=charcoal+gold #c8a96e)
+- Mobile responsive
+- Real copy — no Lorem ipsum
 
-const EDIT_PROMPT = `You are an expert web designer. Edit the website based on the user's request.
+Write TIGHT, efficient CSS and HTML. Keep the total response under 6000 tokens.`;
 
-Make exactly what was asked. Preserve everything else. Return the COMPLETE updated HTML document.
+const EDIT_PROMPT = `You are an expert web designer editing a live website.
 
-Return in EXACTLY this format:
-<<<HTML>>>
-[complete <!DOCTYPE html> document]
-<<<END>>>
-<<<MSG>>>
-[one sentence about what changed]
-<<<END_MSG>>>
-<<<BIZ>>>
-[business name unchanged]
-<<<END_BIZ>>>`;
+Make EXACTLY what was asked. Preserve everything else.
 
-function extract(raw: string, fallbackBiz: string) {
-  let html = "";
-  let msg = "Done! What would you like to change?";
-  let biz = fallbackBiz;
-
-  const htmlMatch = raw.match(/<<<HTML>>>([\s\S]*?)<<<END>>>/);
-  if (htmlMatch) html = htmlMatch[1].trim();
-
-  const msgMatch = raw.match(/<<<MSG>>>([\s\S]*?)<<<END_MSG>>>/);
-  if (msgMatch) msg = msgMatch[1].trim();
-
-  const bizMatch = raw.match(/<<<BIZ>>>([\s\S]*?)<<<END_BIZ>>>/);
-  if (bizMatch) biz = bizMatch[1].trim();
-
-  // Fallback: grab raw HTML block
-  if (!html) {
-    const m = raw.match(/(<!DOCTYPE html[\s\S]*<\/html>)/i);
-    if (m) html = m[1];
-  }
-
-  return { html, msg, biz };
-}
+Return ONLY the complete raw HTML document. No explanation. No markdown. No code blocks.
+Start with <!DOCTYPE html>, end with </html>.`;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { message, currentHtml = "", businessName = "", history = [], seo } = body;
+    const { message, currentHtml = "", businessName = "", history = [] } = body;
 
     if (!message) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
@@ -103,35 +58,63 @@ export async function POST(req: NextRequest) {
       }
       messages.push({
         role: "user",
-        content: `Current HTML:\n\`\`\`html\n${currentHtml.slice(0, 10000)}\n\`\`\`\n\nBusiness: ${businessName}\n\nRequest: ${message}`,
+        content: `Current HTML:\n${currentHtml.slice(0, 8000)}\n\nBusiness: ${businessName}\n\nRequest: ${message}\n\nReturn the full updated HTML only.`,
       });
     } else {
       messages.push({
         role: "user",
-        content: `Build a complete premium website for this business: "${message}"\n\nInfer the industry, services, location tone, and design style. Write real copy. Make it look like a $10k agency built it.`,
+        content: `Build a complete premium website for: "${message}"\n\nInfer the industry, write real copy, pick the right color palette. Return the full HTML only — start with <!DOCTYPE html>.`,
       });
     }
 
-    const response = await client.messages.create({
+    // Use streaming to collect the full response before returning
+    let fullText = "";
+    
+    const stream = await client.messages.stream({
       model: MODEL,
       max_tokens: 8000,
       system: systemPrompt,
       messages,
     });
 
-    const rawText = response.content[0].type === "text" ? response.content[0].text : "";
-    const { html, msg, biz } = extract(rawText, businessName);
-
-    if (!html) {
-      console.error("[chat-edit] No HTML extracted. Raw start:", rawText.slice(0, 400));
-      return NextResponse.json({ error: "Generation failed — please try again." }, { status: 500 });
+    for await (const chunk of stream) {
+      if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+        fullText += chunk.delta.text;
+      }
     }
 
-    let finalHtml = html;
-    try { finalHtml = injectThemeToggle(finalHtml); } catch { /* non-fatal */ }
-    try { finalHtml = injectEmailCaptureForm(finalHtml, { autoTriggerDelay: 4000 }); } catch { /* non-fatal */ }
+    // Extract HTML — it should be the whole response
+    let html = fullText.trim();
+    
+    // Clean up if wrapped in code block
+    if (html.startsWith("```html")) {
+      html = html.replace(/^```html\s*/i, "").replace(/```\s*$/, "").trim();
+    } else if (html.startsWith("```")) {
+      html = html.replace(/^```\s*/i, "").replace(/```\s*$/, "").trim();
+    }
 
-    return NextResponse.json({ html: finalHtml, message: msg, businessName: biz });
+    // Verify it's HTML
+    if (!html.includes("<!DOCTYPE") && !html.includes("<html")) {
+      console.error("[chat-edit] Not HTML. Got:", html.slice(0, 200));
+      return NextResponse.json({ error: "AI returned non-HTML content. Please try again." }, { status: 500 });
+    }
+
+    // Inject platform features
+    try { html = injectThemeToggle(html); } catch { /* non-fatal */ }
+    try { html = injectEmailCaptureForm(html, { autoTriggerDelay: 4000 }); } catch { /* non-fatal */ }
+
+    // Extract business name from HTML title if not provided
+    let detectedBiz = businessName;
+    if (!detectedBiz) {
+      const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+      if (titleMatch) detectedBiz = titleMatch[1].split(/[—\-|]/)[0].trim();
+    }
+
+    return NextResponse.json({
+      html,
+      message: isNew ? `Built your ${detectedBiz || "business"} website — ready to customize!` : "Done! What else would you like to change?",
+      businessName: detectedBiz,
+    });
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
