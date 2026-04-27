@@ -6,217 +6,144 @@ import { injectEmailCaptureForm } from "@/lib/form-injector";
 
 export const maxDuration = 60;
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
-
-interface ChatEditRequest {
-  message: string;
-  currentHtml: string;
-  businessName: string;
-  sourceUrl?: string;
-  history?: Message[];
-  seo?: {
-    title: string;
-    description: string;
-    ogImage?: string;
-    ogTitle?: string;
-    ogDescription?: string;
-    businessType?: string;
-    businessName?: string;
-    address?: string;
-    phone?: string;
-    email?: string;
-    canonical?: string;
-  };
-}
-
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `You are Randy — an expert AI website builder embedded in Sitecraft, a live AI website editor.
+const BUILD_PROMPT = `You are an expert web designer. Build a complete, premium single-page website.
 
-The user is building or editing their website in real time through a chat interface. You receive their request plus the current HTML of their site, and you return an updated version of the complete HTML.
+ALWAYS return a full HTML document using EXACTLY this format — nothing before or after:
 
-YOUR JOB:
-1. Make EXACTLY the change the user requests — no more, no less (unless the change requires structural updates)
-2. Preserve all existing content unless explicitly told to change it
-3. Return a COMPLETE, valid HTML document every time — never truncate
-4. Make the site look premium, modern, and professional
-
-WHEN BUILDING FROM SCRATCH (currentHtml is empty or user describes their business):
-- Generate a complete, beautiful single-page website
-- Include: Hero, Services/Features, Social Proof (testimonials), CTA section, Footer
-- Use real-looking copy — real placeholders for phone, address etc
-- Make it mobile-responsive with a strong dark or light aesthetic
-- Bold typography, strong CTAs, modern layout
-
-DESIGN PRINCIPLES:
-- Premium over generic — custom, not template-looking
-- Every section converts visitors to customers
-- Typography: Google Fonts (Instrument Serif for headings, Inter for body)
-- Colors: strong contrast, purposeful palette, accent color for CTAs
-- Mobile-responsive is non-negotiable
-
-RESPONSE FORMAT — you MUST use this exact format:
-<<<MSG>>>
-Brief friendly message about what you built or changed (1-2 sentences max)
-<<<END_MSG>>>
-<<<BIZ>>>
-Business name (extract from prompt or preserve existing)
-<<<END_BIZ>>>
 <<<HTML>>>
 <!DOCTYPE html>
-<html>
-... complete HTML document here ...
+<html lang="en">
+...complete site...
 </html>
-<<<END_HTML>>>
+<<<END>>>
+<<<MSG>>>
+One sentence describing what you built.
+<<<END_MSG>>>
+<<<BIZ>>>
+Business name extracted from the prompt
+<<<END_BIZ>>>
 
-CRITICAL:
-- ALWAYS output the complete HTML — never truncate, never use "..."
-- The HTML section must be a full valid document with <!DOCTYPE html>
-- Never use JSON — only use the <<<>>> delimiter format above
-- The <<<HTML>>> block must contain the entire page, fully rendered`;
+SITE REQUIREMENTS — always include ALL of these:
+1. Sticky nav with logo + links + phone number + mobile hamburger (working JS)
+2. Full-height hero (100svh) — bold headline speaking to customer pain, 2 CTAs, trust badge
+3. Trust bar — 4-5 signals (years, customers, certifications, guarantee)
+4. Services section — 3-6 cards with emoji icons, inferred from business type
+5. How it works — 3 numbered steps
+6. Testimonials — 3 detailed reviews (name, city, ★★★★★, 3-sentence quote)
+7. FAQ accordion — 5 questions (working JS expand/collapse)
+8. Contact section — form (name, phone, email, service dropdown, message, submit) + hours + address
+9. Footer — logo, links, contact, social placeholders, copyright
+
+DESIGN:
+- Google Fonts: Instrument Serif (headings) + Inter (body)
+- Pick color palette based on industry (trades=dark navy+orange, travel=deep blue+gold, health=white+sage, etc)
+- Mobile-responsive, hover states, smooth scroll
+- Real copy — NO Lorem ipsum. Write actual headlines and content for this specific business.
+- Hamburger menu JS must work. FAQ accordion JS must work. Form shows success message on submit.`;
+
+const EDIT_PROMPT = `You are an expert web designer editing a live website via chat.
+
+Make EXACTLY what the user asked. Preserve everything else. Return the COMPLETE updated HTML document.
+
+Use EXACTLY this format:
+<<<HTML>>>
+<!DOCTYPE html>
+...complete updated site...
+</html>
+<<<END>>>
+<<<MSG>>>
+One sentence about what changed.
+<<<END_MSG>>>
+<<<BIZ>>>
+Business name (unchanged)
+<<<END_BIZ>>>`;
+
+function extract(raw: string, businessName: string) {
+  let html = "";
+  let msg = "Done! What would you like to change next?";
+  let biz = businessName;
+
+  // Primary: custom delimiters
+  const htmlMatch = raw.match(/<<<HTML>>>([\s\S]*?)<<<END>>>/);
+  if (htmlMatch) html = htmlMatch[1].trim();
+
+  const msgMatch = raw.match(/<<<MSG>>>([\s\S]*?)<<<END_MSG>>>/);
+  if (msgMatch) msg = msgMatch[1].trim();
+
+  const bizMatch = raw.match(/<<<BIZ>>>([\s\S]*?)<<<END_BIZ>>>/);
+  if (bizMatch) biz = bizMatch[1].trim();
+
+  // Fallback: grab raw HTML block
+  if (!html) {
+    const m = raw.match(/(<!DOCTYPE html[\s\S]*<\/html>)/i);
+    if (m) html = m[1];
+  }
+
+  return { html, msg, biz };
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const body: ChatEditRequest = await req.json();
-    const { message, currentHtml, businessName, sourceUrl, history = [], seo } = body;
+    const body = await req.json();
+    const { message, currentHtml = "", businessName = "", history = [], seo } = body;
 
     if (!message) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
-    // Build conversation context
-    const conversationMessages: Anthropic.Messages.MessageParam[] = [];
+    const isNew = !currentHtml || currentHtml.trim().length < 50;
+    const systemPrompt = isNew ? BUILD_PROMPT : EDIT_PROMPT;
 
-    // Add history (last 6 turns)
-    for (const msg of history.slice(-6)) {
-      conversationMessages.push({
-        role: msg.role,
-        content: msg.content,
-      });
-    }
+    const messages: Anthropic.Messages.MessageParam[] = [];
 
-    const isInitialBuild = !currentHtml || currentHtml.trim().length < 100;
-
-    // Add the current request with context
-    const userContent = isInitialBuild
-      ? `Build a complete, premium, conversion-focused website for this business: ${message}.
-
-Business name: ${businessName || message.split(/[—\-]/)[0].trim()}
-${sourceUrl ? `Source URL for reference: ${sourceUrl}` : ""}
-
-Requirements:
-- Full single-page website with: Hero, Services, Testimonials, CTA, Footer
-- Premium design — bold typography, strong CTAs, mobile-responsive
-- Use Google Fonts (Instrument Serif + Inter)
-- Include realistic placeholder content (phone, address, reviews)
-- Dark/premium aesthetic by default
-- Make it look like a professional agency built it
-
-Return in the required delimiter format.`
-      : `Current website HTML:
-\`\`\`html
-${currentHtml.slice(0, 15000)}${currentHtml.length > 15000 ? "\n<!-- ... -->" : ""}
-\`\`\`
-
-Business name: ${businessName || "Unknown"}
-${sourceUrl ? `Source URL: ${sourceUrl}` : ""}
-
-User request: ${message}
-
-Return the complete updated HTML in the required delimiter format.`;
-
-    conversationMessages.push({ role: "user", content: userContent });
-
-    const response = await client.messages.create({
-      model: "claude-opus-4-7",
-      max_tokens: 12000,
-      system: SYSTEM_PROMPT,
-      messages: conversationMessages,
-    });
-
-    const rawText = response.content[0].type === "text" ? response.content[0].text : "";
-
-    // Parse delimiter-based response
-    let html = "";
-    let msg = "Done! What would you like to change next?";
-    let biz = businessName;
-
-    // Extract HTML
-    const htmlMatch = rawText.match(/<<<HTML>>>([\s\S]*?)<<<END_HTML>>>/);
-    if (htmlMatch) {
-      html = htmlMatch[1].trim();
-    }
-
-    // Extract message
-    const msgMatch = rawText.match(/<<<MSG>>>([\s\S]*?)<<<END_MSG>>>/);
-    if (msgMatch) {
-      msg = msgMatch[1].trim();
-    }
-
-    // Extract business name
-    const bizMatch = rawText.match(/<<<BIZ>>>([\s\S]*?)<<<END_BIZ>>>/);
-    if (bizMatch) {
-      biz = bizMatch[1].trim();
-    }
-
-    // Fallback: try to extract raw HTML if delimiters failed
-    if (!html) {
-      const doctypeMatch = rawText.match(/(<!DOCTYPE html[\s\S]*<\/html>)/i);
-      if (doctypeMatch) {
-        html = doctypeMatch[1];
+    if (!isNew) {
+      for (const m of (history as {role:"user"|"assistant";content:string}[]).slice(-4)) {
+        messages.push({ role: m.role, content: m.content });
       }
     }
 
+    const userContent = isNew
+      ? `Business: ${message}\n\nBuild a full premium website for this business. Infer everything — services, copy, design style, location tone. Make it look like a $10k agency job.`
+      : `Current HTML:\n\`\`\`html\n${currentHtml.slice(0, 12000)}\n\`\`\`\n\nBusiness: ${businessName}\n\nRequest: ${message}`;
+
+    messages.push({ role: "user", content: userContent });
+
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 8000,
+      system: systemPrompt,
+      messages,
+    });
+
+    const rawText = response.content[0].type === "text" ? response.content[0].text : "";
+    const { html, msg, biz } = extract(rawText, businessName);
+
     if (!html) {
-      console.error("[chat-edit] No HTML extracted. Raw:", rawText.slice(0, 500));
-      return NextResponse.json(
-        { error: "AI did not return valid HTML. Please try again." },
-        { status: 500 }
-      );
+      console.error("[chat-edit] No HTML in response. Raw:", rawText.slice(0, 300));
+      return NextResponse.json({ error: "No HTML generated. Please try again." }, { status: 500 });
     }
 
-    // ✅ AUTO-INJECT FEATURES into all generated sites
     let finalHtml = html;
-
-    // 1. Theme toggle (dark/light mode)
-    finalHtml = injectThemeToggle(finalHtml);
-
-    // 2. Email capture form (lead gen)
-    finalHtml = injectEmailCaptureForm(finalHtml, {
-      position: "footer",
-      autoTriggerDelay: 3000,
-    });
-
-    // 3. SEO meta tags
+    try { finalHtml = injectThemeToggle(finalHtml); } catch { /* non-fatal */ }
+    try { finalHtml = injectEmailCaptureForm(finalHtml, { autoTriggerDelay: 4000 }); } catch { /* non-fatal */ }
     if (seo) {
-      finalHtml = injectSEOMeta(finalHtml, {
-        title: seo.title || businessName || "Untitled",
-        description: seo.description || "Welcome to our site",
-        ogImage: seo.ogImage,
-        ogTitle: seo.ogTitle,
-        ogDescription: seo.ogDescription,
-        businessType: (seo.businessType as any) || "Organization",
-        businessName: seo.businessName || businessName,
-        address: seo.address,
-        phone: seo.phone,
-        email: seo.email,
-        canonical: seo.canonical,
-      });
+      try {
+        finalHtml = injectSEOMeta(finalHtml, {
+          title: seo.title || businessName,
+          description: seo.description || "",
+          businessName: seo.businessName || businessName,
+          businessType: seo.businessType || "Organization",
+        });
+      } catch { /* non-fatal */ }
     }
 
-    return NextResponse.json({
-      html: finalHtml,
-      message: msg,
-      businessName: biz,
-    });
-  } catch (err) {
-    console.error("[chat-edit] Error:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ html: finalHtml, message: msg, businessName: biz });
+
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[chat-edit]", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
