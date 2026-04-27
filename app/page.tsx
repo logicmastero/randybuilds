@@ -1,201 +1,360 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
-type AppState = "landing" | "building" | "builder";
-interface Message { id: string; role: "user"|"assistant"; content: string; }
+type AppState = "landing" | "builder";
+type Device = "desktop" | "tablet" | "mobile";
 
-const EXAMPLES = [
-  "Rocky Mountain Plumbing — residential & commercial plumbing in Calgary AB",
-  "Apex Electrical — licensed electrician serving Edmonton and area",
-  "PrairieAir HVAC — furnace repair and AC installation across Alberta",
-  "GreenEdge Landscaping — design, build & maintain — Calgary & Cochrane",
-  "Finlay Construction — custom builds and basement renos, Cochrane AB",
-  "Peak Performance Physio — sports rehab and injury recovery, Calgary",
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  ts: number;
+}
+
+const PREVIEW_SITES = [
+  {
+    label: "Plumber · Calgary",
+    bg: "#0d1f35",
+    accent: "#4a9eff",
+    emoji: "🔧",
+    hero: "Rocky Mountain Plumbing",
+    sub: "Residential & Commercial · Calgary, AB",
+    tags: ["24/7 Emergency", "Licensed & Insured", "Free Quotes"],
+    stat: "500+ jobs completed",
+  },
+  {
+    label: "Landscaper · Edmonton",
+    bg: "#0d2010",
+    accent: "#5dba5d",
+    emoji: "🌿",
+    hero: "GreenEdge Landscaping",
+    sub: "Design, Build & Maintain · Edmonton, AB",
+    tags: ["Lawn Care", "Snow Removal", "Irrigation"],
+    stat: "Serving Edmonton since 2015",
+  },
+  {
+    label: "Physio · Calgary",
+    bg: "#1f0d1e",
+    accent: "#c06ebb",
+    emoji: "💪",
+    hero: "Peak Performance Physio",
+    sub: "Sports Rehab & Injury Recovery · Calgary",
+    tags: ["IMS Certified", "Direct Billing", "Online Booking"],
+    stat: "4.9★ on Google",
+  },
+  {
+    label: "Electrician · Cochrane",
+    bg: "#201500",
+    accent: "#e8a020",
+    emoji: "⚡",
+    hero: "Apex Electrical",
+    sub: "Licensed Electrician · Cochrane & Calgary",
+    tags: ["Panel Upgrades", "EV Chargers", "Free Estimates"],
+    stat: "Master Electrician on every job",
+  },
+  {
+    label: "HVAC · Airdrie",
+    bg: "#0e0e2a",
+    accent: "#7070e8",
+    emoji: "❄️",
+    hero: "PrairieAir HVAC",
+    sub: "Furnace, AC & Ventilation · Airdrie, AB",
+    tags: ["24/7 Service", "All Brands", "Financing Available"],
+    stat: "1,200+ systems installed",
+  },
+];
+
+const PROMPT_SUGGESTIONS = [
+  { label: "🔧 Plumber", value: "Rocky Mountain Plumbing — residential & commercial plumbing in Calgary AB" },
+  { label: "⚡ Electrician", value: "Apex Electrical — licensed electrician serving Edmonton and surrounding areas" },
+  { label: "❄️ HVAC", value: "PrairieAir HVAC — furnace repair and AC installation across Alberta" },
+  { label: "🌿 Landscaping", value: "GreenEdge Landscaping — design, build & maintain. Calgary & Cochrane" },
+  { label: "🏗️ Construction", value: "Finlay Construction — custom builds and basement renovations, Cochrane AB" },
+  { label: "💪 Physiotherapy", value: "Peak Performance Physiotherapy — sports rehab and injury recovery, Calgary" },
+  { label: "📸 Photography", value: "Prairie Light Photography — wedding and portrait photographer, Alberta" },
+  { label: "🐾 Pet Grooming", value: "Paw & Claw Pet Grooming — mobile grooming services across Calgary" },
+  { label: "🏋️ Personal Training", value: "Iron Valley Fitness — personal training and group classes, Lethbridge AB" },
+  { label: "🍕 Restaurant", value: "Cochrane Pizza Co. — artisan wood-fired pizza and pasta, Cochrane AB" },
 ];
 
 const QUICK_EDITS = [
-  "Make the hero bolder",
-  "Add 3 testimonials",
-  "Switch to dark navy + gold",
-  "Add a contact form",
-  "Make it more premium",
-  "Add services with icons",
-  "Bigger CTA buttons",
-  "Add a photo gallery",
-  "Change to modern fonts",
-  "Add a pricing section",
+  "Make the hero bolder and more impactful",
+  "Add a testimonials section with 3 reviews",
+  "Change the colour scheme to dark navy and gold",
+  "Add a contact form with name, email, phone, message",
+  "Make it look more premium and modern",
+  "Add a services section with icons",
+  "Make the call-to-action button bigger",
+  "Add a photo gallery section",
 ];
 
-const SECTION_LABELS = [
-  "Styles & layout",
-  "Navigation",
-  "Hero section",
-  "Services",
-  "Testimonials",
-  "FAQ",
-  "Contact form",
-  "Footer",
+const GEN_STEPS = [
+  "Reading your business details",
+  "Planning the layout",
+  "Writing your copy",
+  "Designing the sections",
+  "Applying mobile styles",
+  "Final polish",
 ];
 
-// ─── tiny helpers ────────────────────────────────────────────
-const icoS = (name: string) => ({
-  desktop: "M4 4h16v10H4zm6 10v2m-2 2h8",
-  tablet:  "M8 3h8a2 2 0 012 2v14a2 2 0 01-2 2H8a2 2 0 01-2-2V5a2 2 0 012-2zm4 14v.01",
-  mobile:  "M12 18h.01M8 3h8a1 1 0 011 1v16a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1z",
-})[name as "desktop"|"tablet"|"mobile"] ?? "";
+const CSS = `
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: -apple-system, 'Inter', sans-serif; background: #070706; color: #e8e0d0; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pulse { 0%,100% { opacity:.3; transform:scale(.8); } 50% { opacity:1; transform:scale(1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes slideIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+@keyframes glow { 0%,100% { box-shadow:0 0 20px rgba(200,169,110,.06); } 50% { box-shadow:0 0 40px rgba(200,169,110,.18); } }
+@keyframes previewFade { from { opacity:0; transform:scale(.97) translateY(6px); } to { opacity:1; transform:scale(1) translateY(0); } }
+@keyframes chipSlide { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } }
+@keyframes float { 0%,100% { transform:translateY(0px); } 50% { transform:translateY(-6px); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+.logo { display:flex; align-items:center; gap:8px; }
+.logo-mark { width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,#c8a96e,#a07840); display:flex; align-items:center; justify-content:center; font-weight:900; font-size:15px; color:#0a0a08; box-shadow:0 4px 16px rgba(200,169,110,.25); flex-shrink:0; }
+.logo-text { font-weight:800; font-size:18px; letter-spacing:-.3px; }
+.logo-text span { color:#c8a96e; }
+
+.btn-gold { background:#c8a96e; color:#0a0a08; border:none; border-radius:8px; font-weight:800; cursor:pointer; font-family:inherit; transition:all .15s; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
+.btn-gold:hover { background:#d4b87e; }
+.btn-gold:active { transform:scale(.97); }
+.btn-gold:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+.btn-ghost { background:transparent; color:#555; border:1px solid #1a1810; border-radius:8px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .15s; -webkit-tap-highlight-color:transparent; }
+.btn-ghost:hover { border-color:#222; color:#e8e0d0; }
+
+/* ====== LANDING ====== */
+.landing-root { height:100svh; display:flex; flex-direction:column; overflow:hidden; background:#070706; }
+
+/* Nav */
+.landing-nav { height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid rgba(255,255,255,.04); flex-shrink:0; animation:fadeIn .4s ease; }
+.nav-links { display:flex; align-items:center; gap:20px; }
+.nav-link { color:#444; font-size:13px; font-weight:500; text-decoration:none; cursor:pointer; transition:color .15s; background:none; border:none; font-family:inherit; }
+.nav-link:hover { color:#888; }
+
+/* Hero area */
+.landing-hero { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:0; overflow:hidden; }
+@media(max-width:768px) { .landing-hero { grid-template-columns:1fr; } .landing-preview-col { display:none; } }
+
+.landing-left { display:flex; flex-direction:column; justify-content:center; padding:40px 40px 40px 48px; overflow-y:auto; }
+@media(max-width:900px) { .landing-left { padding:28px 24px; } }
+
+.hero-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(200,169,110,.08); border:1px solid rgba(200,169,110,.15); border-radius:20px; padding:5px 12px; font-size:11.5px; color:#c8a96e; font-weight:600; letter-spacing:.3px; margin-bottom:20px; animation:fadeUp .5s ease .1s both; width:fit-content; }
+.hero-dot { width:6px; height:6px; border-radius:50%; background:#c8a96e; animation:pulse 2s ease infinite; }
+
+.hero-headline { font-size:clamp(30px,4.5vw,52px); font-weight:900; line-height:1.1; letter-spacing:-2px; margin-bottom:16px; animation:fadeUp .5s ease .2s both; }
+.hero-headline span { color:#c8a96e; }
+.hero-sub { font-size:clamp(14px,1.8vw,17px); color:#555; line-height:1.7; margin-bottom:32px; animation:fadeUp .5s ease .3s both; max-width:420px; }
+
+/* Input */
+.main-input-wrap { width:100%; max-width:560px; position:relative; animation:fadeUp .5s ease .4s both; }
+.main-input { width:100%; background:#0d0c0a; border:1.5px solid rgba(200,169,110,.18); border-radius:14px; padding:16px 56px 16px 18px; color:#e8e0d0; font-size:15px; font-family:inherit; line-height:1.5; resize:none; outline:none; transition:border-color .2s, box-shadow .2s; min-height:58px; max-height:140px; overflow-y:auto; display:block; }
+.main-input:focus { border-color:rgba(200,169,110,.45); box-shadow:0 0 0 3px rgba(200,169,110,.06); }
+.main-input::placeholder { color:#222; }
+.send-btn { position:absolute; right:10px; bottom:10px; width:38px; height:38px; border-radius:10px; background:#c8a96e; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:17px; color:#0a0a08; font-weight:900; transition:all .15s; -webkit-tap-highlight-color:transparent; }
+.send-btn:hover { background:#d4b87e; transform:scale(1.05); }
+.send-btn:active { transform:scale(.95); }
+.send-btn:disabled { opacity:.3; cursor:not-allowed; transform:none; }
+
+/* Suggestion chips */
+.suggestions-label { font-size:11px; color:#333; font-weight:600; letter-spacing:.5px; text-transform:uppercase; margin-top:14px; margin-bottom:8px; animation:fadeUp .5s ease .5s both; }
+.suggestions-row { display:flex; flex-wrap:wrap; gap:7px; max-width:560px; animation:fadeUp .5s ease .55s both; }
+.sug-chip { background:#0d0c0a; border:1px solid #181610; border-radius:20px; padding:7px 14px; font-size:12px; color:#555; cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .18s; -webkit-tap-highlight-color:transparent; }
+.sug-chip:hover { border-color:rgba(200,169,110,.3); color:#c8a96e; background:rgba(200,169,110,.04); transform:translateY(-1px); }
+.sug-chip:active { transform:translateY(0); }
+
+/* Social proof */
+.social-proof { display:flex; align-items:center; gap:14px; margin-top:28px; animation:fadeUp .5s ease .65s both; }
+.proof-avatars { display:flex; }
+.proof-avatar { width:26px; height:26px; border-radius:50%; border:2px solid #070706; background:linear-gradient(135deg,#c8a96e,#a07840); display:flex; align-items:center; justify-content:center; font-size:10px; margin-left:-6px; font-weight:700; color:#0a0a08; flex-shrink:0; }
+.proof-avatar:first-child { margin-left:0; }
+.proof-text { font-size:12px; color:#444; line-height:1.5; }
+.proof-text strong { color:#888; }
+
+/* ── RIGHT SIDE: Preview carousel ── */
+.landing-preview-col { display:flex; flex-direction:column; justify-content:center; align-items:center; padding:32px 48px 32px 24px; position:relative; overflow:hidden; }
+
+.preview-frame-wrap { width:100%; max-width:360px; position:relative; animation:fadeUp .6s ease .25s both; }
+
+/* Floating label */
+.preview-floating-label { position:absolute; top:-14px; left:16px; background:#c8a96e; color:#0a0a08; font-size:10.5px; font-weight:800; padding:3px 10px; border-radius:10px; letter-spacing:.3px; z-index:10; }
+
+/* Browser chrome */
+.preview-chrome { background:#111; border:1px solid #1a1810; border-radius:12px; overflow:hidden; box-shadow:0 24px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.03); }
+.preview-chrome-bar { height:30px; background:#0d0c0a; border-bottom:1px solid #1a1810; display:flex; align-items:center; padding:0 10px; gap:6px; }
+.chrome-dots { display:flex; gap:4px; }
+.chrome-url { flex:1; background:#111; border-radius:4px; height:16px; display:flex; align-items:center; padding:0 8px; font-size:9px; color:#333; overflow:hidden; }
+
+/* Mini site preview */
+.preview-site { background:var(--site-bg); min-height:280px; padding:0; overflow:hidden; transition:all .4s ease; animation:previewFade .4s ease; }
+.preview-site-hero { background:var(--site-bg); padding:20px 18px 16px; border-bottom:1px solid rgba(255,255,255,.05); }
+.preview-site-emoji { font-size:22px; margin-bottom:8px; animation:float 3s ease infinite; display:inline-block; }
+.preview-site-title { font-size:14px; font-weight:900; color:#fff; margin-bottom:3px; letter-spacing:-.3px; }
+.preview-site-sub { font-size:9.5px; color:rgba(255,255,255,.4); margin-bottom:12px; }
+.preview-site-tags { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:12px; }
+.preview-site-tag { background:rgba(255,255,255,.07); border-radius:4px; padding:2px 6px; font-size:8.5px; color:rgba(255,255,255,.5); }
+.preview-site-cta { border:none; border-radius:6px; padding:7px 14px; font-size:10px; font-weight:800; color:#0a0a08; cursor:pointer; font-family:inherit; }
+
+/* Nav dots */
+.preview-nav { display:flex; gap:6px; justify-content:center; margin-top:14px; }
+.preview-nav-dot { width:24px; height:4px; border-radius:2px; cursor:pointer; transition:all .25s; }
+.preview-nav-dot.active { background:#c8a96e; }
+.preview-nav-dot:not(.active) { background:#1a1810; }
+.preview-nav-dot:hover:not(.active) { background:#2a2820; }
+
+/* Side thumbnails */
+.preview-thumbs { display:flex; flex-direction:column; gap:8px; position:absolute; right:12px; top:50%; transform:translateY(-50%); }
+.preview-thumb { width:40px; height:32px; border-radius:6px; border:1.5px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition:all .2s; overflow:hidden; }
+.preview-thumb.active { border-color:rgba(200,169,110,.5); }
+.preview-thumb:not(.active) { opacity:.4; }
+.preview-thumb:not(.active):hover { opacity:.7; }
+
+/* Stats ribbon */
+.stats-ribbon { display:flex; gap:24px; padding:14px 48px; border-top:1px solid rgba(255,255,255,.04); flex-shrink:0; animation:fadeIn .5s ease 1s both; }
+.stat-item { text-align:center; flex:1; }
+.stat-num { font-size:17px; font-weight:900; color:#c8a96e; }
+.stat-label { font-size:10px; color:#333; margin-top:1px; letter-spacing:.3px; text-transform:uppercase; }
+
+/* ====== BUILDER ====== */
+.builder-wrap { height:100svh; display:flex; flex-direction:column; animation:fadeIn .3s ease; }
+.builder-topbar { height:50px; background:#0a0a08; border-bottom:1px solid #1a1810; display:flex; align-items:center; padding:0 10px; gap:8px; flex-shrink:0; z-index:20; }
+.builder-body { flex:1; display:flex; overflow:hidden; min-height:0; }
+
+.chat-panel { width:320px; flex-shrink:0; display:flex; flex-direction:column; background:#0a0a08; border-right:1px solid #1a1810; }
+.chat-messages { flex:1; overflow-y:auto; padding:14px 12px; display:flex; flex-direction:column; gap:10px; scroll-behavior:smooth; }
+.chat-messages::-webkit-scrollbar { width:3px; }
+.chat-messages::-webkit-scrollbar-thumb { background:#1a1810; border-radius:2px; }
+.msg-bubble { padding:10px 13px; font-size:13.5px; line-height:1.6; animation:slideIn .2s ease; border-radius:12px; }
+.msg-user { align-self:flex-end; max-width:90%; background:#c8a96e; color:#0a0a08; font-weight:500; border-radius:14px 14px 3px 14px; }
+.msg-ai { align-self:flex-start; max-width:92%; background:#111; color:#c8c0b0; border:1px solid #1a1810; border-radius:14px 14px 14px 3px; }
+.typing-wrap { align-self:flex-start; background:#111; border:1px solid #1a1810; border-radius:14px 14px 14px 3px; padding:12px 16px; display:flex; gap:5px; animation:slideIn .2s ease; }
+.typing-dot { width:6px; height:6px; border-radius:50%; background:#c8a96e; }
+.chat-input-area { padding:8px 10px 12px; border-top:1px solid #1a1810; flex-shrink:0; }
+.quick-edits { display:flex; gap:6px; overflow-x:auto; padding-bottom:7px; scrollbar-width:none; }
+.quick-edits::-webkit-scrollbar { display:none; }
+.quick-chip { background:transparent; border:1px solid #1a1810; border-radius:16px; padding:5px 11px; font-size:11.5px; color:#444; cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .15s; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+.quick-chip:hover { border-color:rgba(200,169,110,.25); color:#c8a96e; }
+.chat-input-row { display:flex; gap:7px; align-items:flex-end; }
+.chat-ta { flex:1; background:#0d0c0a; border:1px solid #1a1810; border-radius:10px; padding:10px 12px; color:#e8e0d0; font-size:14px; font-family:inherit; resize:none; outline:none; line-height:1.5; max-height:100px; transition:border-color .15s; }
+.chat-ta:focus { border-color:rgba(200,169,110,.3); }
+.chat-ta::placeholder { color:#2a2922; }
+.chat-ta:disabled { opacity:.5; }
+.chat-send-btn { width:36px; height:36px; border-radius:9px; background:#c8a96e; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:900; color:#0a0a08; transition:all .15s; flex-shrink:0; -webkit-tap-highlight-color:transparent; }
+.chat-send-btn:hover { background:#d4b87e; }
+.chat-send-btn:active { transform:scale(.94); }
+.chat-send-btn:disabled { opacity:.35; cursor:not-allowed; transform:none; }
+
+.preview-panel { flex:1; display:flex; flex-direction:column; min-width:0; background:#0d0c0a; position:relative; }
+.preview-bar { height:38px; background:#0a0a08; border-bottom:1px solid #1a1810; display:flex; align-items:center; padding:0 10px; gap:8px; flex-shrink:0; }
+.preview-dots { display:flex; gap:5px; flex-shrink:0; }
+.url-bar { flex:1; background:#111; border:1px solid #1a1810; border-radius:6px; height:24px; display:flex; align-items:center; padding:0 10px; font-size:11px; color:#444; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; min-width:0; }
+.device-btn { width:27px; height:27px; border-radius:6px; background:transparent; border:1px solid transparent; color:#444; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; transition:all .15s; -webkit-tap-highlight-color:transparent; }
+.device-btn.active { background:rgba(200,169,110,.1); border-color:rgba(200,169,110,.25); color:#c8a96e; }
+
+.gen-overlay { position:absolute; inset:0; background:#0a0a08; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:28px; z-index:10; animation:fadeIn .3s ease; }
+.gen-step { display:flex; align-items:center; gap:10px; font-size:13px; color:#333; transition:color .3s; }
+.gen-step.active { color:#c8a96e; }
+.gen-step.done { color:#3a3228; }
+.gen-dot { width:8px; height:8px; border-radius:50%; background:currentColor; flex-shrink:0; }
+.gen-step.active .gen-dot { animation:pulse 1s ease infinite; }
+`;
 
 export default function Home() {
-  const [appState, setAppState]       = useState<AppState>("landing");
+  const router = useRouter();
+  const [appState, setAppState] = useState<AppState>("landing");
   const [landingInput, setLandingInput] = useState("");
-  const [messages, setMessages]       = useState<Message[]>([]);
-  const [chatInput, setChatInput]     = useState("");
-  const [siteHtml, setSiteHtml]       = useState("");
-  const [streamHtml, setStreamHtml]   = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [siteHtml, setSiteHtml] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [device, setDevice] = useState<Device>("desktop");
   const [businessName, setBusinessName] = useState("");
-  const [generating, setGenerating]   = useState(false);
-  const [sectionsBuilt, setSectionsBuilt] = useState(0);
-  const [device, setDevice]           = useState<"desktop"|"tablet"|"mobile">("desktop");
-  const [panelOpen, setPanelOpen]     = useState(true);
+  const [genStep, setGenStep] = useState(0);
+  const [activePreview, setActivePreview] = useState(0);
 
-  const chatEndRef  = useRef<HTMLDivElement>(null);
-  const chatTaRef   = useRef<HTMLTextAreaElement>(null);
-  const landingRef  = useRef<HTMLTextAreaElement>(null);
-  const iframeRef   = useRef<HTMLIFrameElement>(null);
-  const historyRef  = useRef<{role:"user"|"assistant";content:string}[]>([]);
-  const streamRef   = useRef("");   // accumulates raw HTML stream
+  const landingRef = useRef<HTMLTextAreaElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const chatTaRef = useRef<HTMLTextAreaElement>(null);
+  const historyRef = useRef<{ role: string; content: string }[]>([]);
 
-  // ── scroll chat to bottom ──────────────────────────────────
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, generating]);
-
-  // ── write streamHtml into iframe ───────────────────────────
+  // Auto-cycle previews
   useEffect(() => {
-    const html = streamHtml || siteHtml;
-    if (!html || !iframeRef.current) return;
-    const doc = iframeRef.current.contentDocument ?? iframeRef.current.contentWindow?.document;
-    if (!doc) return;
-    doc.open(); doc.write(html); doc.close();
-  }, [streamHtml, siteHtml]);
+    if (appState !== "landing") return;
+    const t = setInterval(() => setActivePreview(p => (p + 1) % PREVIEW_SITES.length), 3200);
+    return () => clearInterval(t);
+  }, [appState]);
 
-  const addMsg = useCallback((role:"user"|"assistant", content:string) => {
-    const m: Message = { id: Math.random().toString(36).slice(2), role, content };
-    setMessages(prev => [...prev, m]);
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (siteHtml && iframeRef.current) {
+      const doc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
+      if (doc) { doc.open(); doc.write(siteHtml); doc.close(); }
+    }
+  }, [siteHtml]);
+
+  const autoResize = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  };
+
+  // Gen step animation
+  useEffect(() => {
+    if (!generating) { setGenStep(0); return; }
+    setGenStep(0);
+    const timings = [800, 1600, 2800, 4200, 5800, 7200];
+    const timers = timings.map((t, i) => setTimeout(() => setGenStep(i), t));
+    return () => timers.forEach(clearTimeout);
+  }, [generating]);
+
+  const addMsg = useCallback((role: "user" | "assistant", content: string) => {
+    const msg = { id: Math.random().toString(36).slice(2), role, content, ts: Date.now() };
+    setMessages(prev => [...prev, msg]);
     historyRef.current.push({ role, content });
+    if (historyRef.current.length > 20) historyRef.current = historyRef.current.slice(-20);
   }, []);
 
-  // ── streaming fetch ────────────────────────────────────────
-  const callAPI = useCallback(async (userMsg: string, currentHtml: string, biz: string) => {
+  const callAPI = useCallback(async (userMsg: string, currentHtml: string, bizName: string) => {
     setGenerating(true);
-    setSectionsBuilt(0);
-    streamRef.current = "";
-
     try {
       const res = await fetch("/api/chat-edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMsg, currentHtml, businessName: biz, history: historyRef.current.slice(-8) }),
+        body: JSON.stringify({
+          message: userMsg,
+          currentHtml,
+          businessName: bizName,
+          conversationHistory: historyRef.current.slice(-10),
+        }),
       });
-
-      if (!res.ok || !res.body) throw new Error(`${res.status}`);
-
-      const contentType = res.headers.get("content-type") ?? "";
-      const isSSE = contentType.includes("text/event-stream");
-
-      if (isSSE) {
-        // ── SSE streaming mode ──────────────────────────────
-        const reader = res.body.getReader();
-        const dec    = new TextDecoder();
-        let   buf    = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-
-          const lines = buf.split("\n");
-          buf = lines.pop() ?? "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const raw = line.slice(6).trim();
-            if (!raw) continue;
-
-            try {
-              const evt = JSON.parse(raw);
-
-              if (evt.type === "chunk") {
-                // Live HTML streaming — accumulate and write to iframe
-                streamRef.current += evt.text;
-                // Throttle DOM writes: only update every ~300 chars
-                if (streamRef.current.length % 300 < evt.text.length) {
-                  const partial = streamRef.current;
-                  setStreamHtml(partial + "</body></html>");
-                }
-              }
-
-              if (evt.type === "section") {
-                setSectionsBuilt(evt.count);
-              }
-
-              if (evt.type === "complete") {
-                // Edit-mode: full HTML in one shot
-                setSiteHtml(evt.html);
-                setStreamHtml("");
-                if (evt.businessName) setBusinessName(evt.businessName);
-                addMsg("assistant", evt.message ?? "Done! What else would you like to change?");
-                setAppState("builder");
-              }
-
-              if (evt.type === "done") {
-                // Build-mode: stream finished
-                const finalHtml = streamRef.current;
-                setSiteHtml(finalHtml);
-                setStreamHtml("");
-                if (evt.businessName) setBusinessName(evt.businessName);
-
-                // Detect biz name from title if not set
-                if (!evt.businessName) {
-                  const m = finalHtml.match(/<title>([^<]+)<\/title>/i);
-                  if (m) setBusinessName(m[1].split(/[—\-|]/)[0].trim());
-                }
-
-                addMsg("assistant", evt.message ?? "Done! What else would you like to change?");
-                setAppState("builder");
-              }
-
-              if (evt.type === "error") throw new Error(evt.message);
-
-            } catch { /* skip malformed events */ }
-          }
-        }
-      } else {
-        // ── Non-SSE fallback (JSON) ─────────────────────────
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        setSiteHtml(data.html);
-        setStreamHtml("");
-        if (data.businessName) setBusinessName(data.businessName);
-        addMsg("assistant", data.message ?? "Done! What else would you like to change?");
-        setAppState("builder");
-      }
-
-    } catch (err) {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setSiteHtml(data.html);
+      if (data.businessName) setBusinessName(data.businessName);
+      addMsg("assistant", data.message || "Done! What else would you like to change?");
+    } catch {
       addMsg("assistant", "Something went wrong — try rephrasing and I'll try again.");
-      if (!siteHtml) setAppState("landing");
-      else setAppState("builder");
     } finally {
       setGenerating(false);
     }
-  }, [addMsg, siteHtml]);
+  }, [addMsg]);
 
-  const handleLaunch = useCallback(() => {
-    const text = landingInput.trim();
+  const handleLaunch = useCallback((inputOverride?: string) => {
+    const text = (inputOverride || landingInput).trim();
     if (!text || generating) return;
     const biz = text.split(/[—\-]/)[0].trim();
     setBusinessName(biz);
-    setAppState("building");
+    setAppState("builder");
     addMsg("user", text);
-    addMsg("assistant", `Building your ${biz} site — watch it appear section by section.`);
-    callAPI(`Build a complete premium website for: ${text}`, "", biz);
+    addMsg("assistant", `On it — building your site for ${biz}. Give me about 15 seconds.`);
+    callAPI(`Build a complete, premium, conversion-focused website for this business: ${text}. Make it look like it was designed by a professional agency — bold typography, strong CTAs, real-looking copy, mobile-responsive. Include hero, services, social proof, and contact sections.`, "", biz);
   }, [landingInput, generating, callAPI, addMsg]);
 
   const handleChatSend = useCallback(() => {
@@ -207,322 +366,316 @@ export default function Home() {
     callAPI(text, siteHtml, businessName);
   }, [chatInput, generating, siteHtml, businessName, callAPI, addMsg]);
 
-  const handleReset = () => {
-    setAppState("landing"); setMessages([]); setSiteHtml(""); setStreamHtml("");
-    setLandingInput(""); historyRef.current = []; setBusinessName(""); setSectionsBuilt(0);
-  };
-
+  const site = PREVIEW_SITES[activePreview];
   const previewWidth = device === "desktop" ? "100%" : device === "tablet" ? "768px" : "390px";
-  const totalSections = SECTION_LABELS.length;
 
-  // ═══════════════════════════════════════════════════════════
+  // ========================
   // LANDING
-  // ═══════════════════════════════════════════════════════════
+  // ========================
   if (appState === "landing") return (
-    <div style={{ minHeight:"100svh", background:"#080807", color:"#e8e0d0", fontFamily:"-apple-system,'Inter',sans-serif", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 20px 60px", position:"relative", overflow:"hidden" }}>
-      
-      {/* Ambient glow */}
-      <div style={{ position:"fixed", top:"-15%", left:"50%", transform:"translateX(-50%)", width:"700px", height:"500px", background:"radial-gradient(ellipse,rgba(200,169,110,.07) 0%,transparent 70%)", filter:"blur(40px)", pointerEvents:"none", zIndex:0 }} />
-      
-      <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:660, display:"flex", flexDirection:"column", alignItems:"center" }}>
+    <div className="landing-root">
+      <style>{CSS}</style>
 
-        {/* Logo */}
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:48, animation:"fadeUp .5s ease .05s both" }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#c8a96e,#a07840)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:16, color:"#0a0a08", boxShadow:"0 4px 20px rgba(200,169,110,.3)" }}>S</div>
-          <span style={{ fontWeight:800, fontSize:20, letterSpacing:"-.4px" }}>Site<span style={{ color:"#c8a96e" }}>craft</span></span>
+      {/* Nav */}
+      <nav className="landing-nav">
+        <div className="logo">
+          <div className="logo-mark">S</div>
+          <div className="logo-text">Site<span>craft</span></div>
         </div>
-
-        {/* Headline */}
-        <div style={{ textAlign:"center", marginBottom:14, animation:"fadeUp .5s ease .1s both" }}>
-          <h1 style={{ fontSize:"clamp(32px,6vw,54px)", fontWeight:900, letterSpacing:"-2px", lineHeight:1.08, margin:0, color:"#e8e0d0" }}>
-            Describe your business.
-          </h1>
-          <h1 style={{ fontSize:"clamp(32px,6vw,54px)", fontWeight:900, letterSpacing:"-2px", lineHeight:1.08, margin:0, color:"#c8a96e" }}>
-            Watch your site appear.
-          </h1>
+        <div className="nav-links">
+          <button className="nav-link" onClick={() => router.push("/how-it-works")}>How it works</button>
+          <button className="nav-link" onClick={() => router.push("/pricing")}>Pricing</button>
+          <button className="nav-link" onClick={() => router.push("/case-studies")}>Examples</button>
+          <button className="btn-gold" style={{ padding: "7px 16px", fontSize: 13 }} onClick={() => router.push("/dashboard")}>Dashboard →</button>
         </div>
+      </nav>
 
-        <p style={{ fontSize:"clamp(14px,2vw,16px)", color:"#3a3830", textAlign:"center", lineHeight:1.75, maxWidth:440, marginBottom:28, animation:"fadeUp .5s ease .18s both" }}>
-          Tell Sitecraft what you do. It writes the copy, picks the colours,<br/>and builds the whole site — section by section, live.
-        </p>
+      {/* Hero */}
+      <div className="landing-hero">
 
-        {/* Trust badges */}
-        <div style={{ display:"flex", gap:8, marginBottom:28, flexWrap:"wrap", justifyContent:"center", animation:"fadeUp .5s ease .24s both" }}>
-          {["Real copy","Mobile-ready","Edit with chat","Download HTML"].map((t,i) => (
-            <div key={i} style={{ background:"#0e0d0b", border:"1px solid #1e1c18", borderRadius:20, padding:"5px 13px", fontSize:12, color:"#3a3830", display:"flex", alignItems:"center", gap:5 }}>
-              <span style={{ color:"#c8a96e", fontSize:9 }}>✦</span>{t}
+        {/* LEFT — headline + input */}
+        <div className="landing-left">
+          <div className="hero-badge">
+            <span className="hero-dot" />
+            AI website builder for Alberta businesses
+          </div>
+
+          <h1 className="hero-headline">
+            Describe your<br />
+            business.<br />
+            <span>Watch your site appear.</span>
+          </h1>
+
+          <p className="hero-sub">
+            Tell Sitecraft what you do and where you are. A complete, professional website is ready in 15 seconds — then chat to refine it until it's perfect.
+          </p>
+
+          <div className="main-input-wrap">
+            <textarea
+              ref={landingRef}
+              className="main-input"
+              rows={2}
+              placeholder="e.g. Rocky Mountain Plumbing — residential and commercial plumbing in Calgary AB"
+              value={landingInput}
+              onChange={e => { setLandingInput(e.target.value); autoResize(e.target); }}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleLaunch(); } }}
+            />
+            <button className="send-btn" onClick={() => handleLaunch()} disabled={!landingInput.trim()}>↗</button>
+          </div>
+
+          <div className="suggestions-label">Try one of these</div>
+          <div className="suggestions-row">
+            {PROMPT_SUGGESTIONS.map((p, i) => (
+              <button
+                key={i}
+                className="sug-chip"
+                onClick={() => {
+                  setLandingInput(p.value);
+                  setTimeout(() => landingRef.current?.focus(), 50);
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="social-proof">
+            <div className="proof-avatars">
+              {["A","B","C","D"].map((l, i) => (
+                <div key={i} className="proof-avatar" style={{ background: `hsl(${30 + i * 40}, 60%, 45%)` }}>{l}</div>
+              ))}
             </div>
-          ))}
-        </div>
-
-        {/* Input */}
-        <div style={{ width:"100%", position:"relative", animation:"fadeUp .5s ease .3s both" }}>
-          <textarea
-            ref={landingRef}
-            rows={2}
-            placeholder="e.g. Rocky Mountain Plumbing — residential and commercial plumbing in Calgary AB"
-            value={landingInput}
-            onChange={e => { setLandingInput(e.target.value); e.target.style.height="auto"; e.target.style.height=Math.min(e.target.scrollHeight,160)+"px"; }}
-            onKeyDown={e => { if (e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleLaunch();} }}
-            style={{ width:"100%", background:"#0e0d0b", border:`1px solid ${landingInput?"rgba(200,169,110,.4)":"rgba(200,169,110,.12)"}`, borderRadius:16, padding:"20px 72px 20px 22px", color:"#e8e0d0", fontSize:16, fontFamily:"inherit", lineHeight:1.6, resize:"none", outline:"none", boxSizing:"border-box", boxShadow: landingInput ? "0 0 0 3px rgba(200,169,110,.06),0 8px 32px rgba(0,0,0,.5)" : "0 8px 32px rgba(0,0,0,.3)", transition:"all .2s" }}
-          />
-          <button onClick={handleLaunch} disabled={!landingInput.trim()}
-            style={{ position:"absolute", right:12, bottom:12, width:46, height:46, borderRadius:13, background: landingInput.trim() ? "linear-gradient(135deg,#c8a96e,#a87030)" : "#151310", border:"none", cursor: landingInput.trim() ? "pointer" : "default", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, color: landingInput.trim() ? "#0a0a08" : "#2a2520", fontWeight:700, transition:"all .2s", boxShadow: landingInput.trim() ? "0 4px 16px rgba(200,169,110,.3)" : "none" }}>
-            →
-          </button>
-        </div>
-
-        {/* Example chips */}
-        <div style={{ display:"flex", gap:7, flexWrap:"wrap", justifyContent:"center", marginTop:14, animation:"fadeUp .5s ease .38s both" }}>
-          {EXAMPLES.map((ex,i) => {
-            const label = ex.split(/[—\-]/)[0].trim();
-            return (
-              <button key={i} onClick={() => { setLandingInput(ex); landingRef.current?.focus(); }}
-                style={{ background:"#0d0c0a", border:"1px solid #181612", borderRadius:20, padding:"7px 15px", fontSize:12, color:"#2e2c28", cursor:"pointer", fontFamily:"inherit", transition:"all .15s", whiteSpace:"nowrap" }}
-                onMouseEnter={e => { const b=e.currentTarget; b.style.borderColor="rgba(200,169,110,.18)"; b.style.color="#c8a96e"; }}
-                onMouseLeave={e => { const b=e.currentTarget; b.style.borderColor="#181612"; b.style.color="#2e2c28"; }}
-              >{label}</button>
-            );
-          })}
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes pulse{0%,100%{opacity:.2;transform:scale(.6)}50%{opacity:1;transform:scale(1)}}
-        @keyframes slideIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-        *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:3px;height:3px}
-        ::-webkit-scrollbar-thumb{background:#1a1810;border-radius:3px}
-      `}</style>
-    </div>
-  );
-
-  // ═══════════════════════════════════════════════════════════
-  // BUILDING — section-by-section reveal screen
-  // ═══════════════════════════════════════════════════════════
-  if (appState === "building") return (
-    <div style={{ height:"100svh", background:"#080807", color:"#e8e0d0", fontFamily:"-apple-system,'Inter',sans-serif", display:"flex", overflow:"hidden" }}>
-
-      {/* Left — progress panel */}
-      <div style={{ width:300, flexShrink:0, display:"flex", flexDirection:"column", background:"#0a0908", borderRight:"1px solid #161410", padding:"32px 24px", justifyContent:"center", gap:32 }}>
-        
-        <div>
-          <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:28 }}>
-            <div style={{ width:32, height:32, borderRadius:9, background:"linear-gradient(135deg,#c8a96e,#a07840)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:14, color:"#0a0a08", boxShadow:"0 2px 14px rgba(200,169,110,.35)" }}>S</div>
-            <span style={{ fontWeight:800, fontSize:16, letterSpacing:"-.3px" }}>Site<span style={{ color:"#c8a96e" }}>craft</span></span>
+            <div className="proof-text">
+              <strong>200+ Alberta businesses</strong> launched their site with Sitecraft
+            </div>
           </div>
-          <div style={{ fontSize:11, color:"#c8a96e", fontWeight:700, letterSpacing:"1.8px", textTransform:"uppercase", marginBottom:8 }}>Building</div>
-          <div style={{ fontSize:22, fontWeight:800, letterSpacing:"-.5px", color:"#e8e0d0", lineHeight:1.2, marginBottom:4 }}>{businessName || "Your site"}</div>
-          <div style={{ fontSize:13, color:"#2e2c28" }}>Watch each section appear →</div>
         </div>
 
-        {/* Section steps */}
-        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-          {SECTION_LABELS.map((label, i) => {
-            const isDone    = i < sectionsBuilt;
-            const isActive  = i === sectionsBuilt;
-            const isPending = i > sectionsBuilt;
-            return (
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:11, padding:"9px 12px", borderRadius:10, background: isActive ? "rgba(200,169,110,.07)" : "transparent", border: isActive ? "1px solid rgba(200,169,110,.14)" : "1px solid transparent", transition:"all .35s ease" }}>
-                {/* Status dot */}
-                <div style={{ width:20, height:20, borderRadius:"50%", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", background: isDone ? "rgba(200,169,110,.15)" : isActive ? "transparent" : "transparent", border: isActive ? "2px solid #1a1810" : "none", transition:"all .35s" }}>
-                  {isDone  && <span style={{ fontSize:10, color:"#c8a96e" }}>✓</span>}
-                  {isActive && <div style={{ width:14, height:14, borderRadius:"50%", border:"2px solid #1e1c18", borderTopColor:"#c8a96e", animation:"spin 1s linear infinite" }} />}
-                  {isPending && <div style={{ width:6, height:6, borderRadius:"50%", background:"#1e1c18" }} />}
+        {/* RIGHT — live preview carousel */}
+        <div className="landing-preview-col">
+          <div className="preview-frame-wrap">
+            <div className="preview-floating-label">
+              {site.label}
+            </div>
+
+            <div className="preview-chrome">
+              <div className="preview-chrome-bar">
+                <div className="chrome-dots">
+                  {["#ff5f57","#febc2e","#28c840"].map(c => (
+                    <div key={c} style={{ width: 8, height: 8, borderRadius: "50%", background: c }} />
+                  ))}
                 </div>
-                <span style={{ fontSize:13, color: isDone ? "#3a3830" : isActive ? "#e8e0d0" : "#1e1c18", fontWeight: isActive ? 600 : 400, transition:"color .35s" }}>{label}</span>
+                <div className="chrome-url">
+                  {site.hero.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20)}.sitecraft.ai
+                </div>
               </div>
-            );
-          })}
-        </div>
 
-        {/* Progress bar */}
-        <div>
-          <div style={{ height:2, background:"#161410", borderRadius:2, overflow:"hidden", marginBottom:8 }}>
-            <div style={{ height:"100%", width:`${(sectionsBuilt/totalSections)*100}%`, background:"linear-gradient(90deg,#8a6030,#c8a96e)", borderRadius:2, transition:"width .5s ease", boxShadow:"0 0 8px rgba(200,169,110,.3)" }} />
+              <div
+                key={activePreview}
+                className="preview-site"
+                style={{ ["--site-bg" as string]: site.bg }}
+              >
+                {/* Hero section */}
+                <div className="preview-site-hero" style={{ ["--site-bg" as string]: site.bg }}>
+                  <div className="preview-site-emoji">{site.emoji}</div>
+                  <div className="preview-site-title">{site.hero}</div>
+                  <div className="preview-site-sub">{site.sub}</div>
+                  <div className="preview-site-tags">
+                    {site.tags.map((t, i) => <span key={i} className="preview-site-tag">{t}</span>)}
+                  </div>
+                  <button
+                    className="preview-site-cta"
+                    style={{ background: site.accent }}
+                  >
+                    Get a Free Quote →
+                  </button>
+                </div>
+
+                {/* Fake content blocks */}
+                <div style={{ padding: "12px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {/* Services row */}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {[0,1,2].map(i => (
+                      <div key={i} style={{ flex: 1, background: "rgba(255,255,255,.04)", borderRadius: 6, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: "60%", height: 7, background: "rgba(255,255,255,.08)", borderRadius: 3 }} />
+                      </div>
+                    ))}
+                  </div>
+                  {/* Stat pill */}
+                  <div style={{ background: `${site.accent}18`, border: `1px solid ${site.accent}30`, borderRadius: 6, padding: "6px 10px", fontSize: 9, color: site.accent, fontWeight: 700, textAlign: "center" }}>
+                    {site.stat}
+                  </div>
+                  {/* Testimonial */}
+                  <div style={{ background: "rgba(255,255,255,.03)", borderRadius: 6, padding: "8px 10px" }}>
+                    <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+                      {"★★★★★".split("").map((s, i) => <span key={i} style={{ color: "#f59e0b", fontSize: 9 }}>{s}</span>)}
+                    </div>
+                    <div style={{ height: 6, background: "rgba(255,255,255,.07)", borderRadius: 3, marginBottom: 3, width: "90%" }} />
+                    <div style={{ height: 6, background: "rgba(255,255,255,.05)", borderRadius: 3, width: "65%" }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Dot nav */}
+            <div className="preview-nav">
+              {PREVIEW_SITES.map((_, i) => (
+                <div
+                  key={i}
+                  className={`preview-nav-dot${i === activePreview ? " active" : ""}`}
+                  onClick={() => setActivePreview(i)}
+                />
+              ))}
+            </div>
           </div>
-          <div style={{ fontSize:11, color:"#2e2c28", display:"flex", justifyContent:"space-between" }}>
-            <span>{sectionsBuilt} of {totalSections} sections</span>
-            <span>{Math.round((sectionsBuilt/totalSections)*100)}%</span>
+
+          {/* Side thumbnails */}
+          <div className="preview-thumbs">
+            {PREVIEW_SITES.map((s, i) => (
+              <div
+                key={i}
+                className={`preview-thumb${i === activePreview ? " active" : ""}`}
+                style={{ background: s.bg }}
+                onClick={() => setActivePreview(i)}
+              >
+                <span style={{ fontSize: 14 }}>{s.emoji}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Right — live preview */}
-      <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0 }}>
-        {/* Browser chrome */}
-        <div style={{ height:40, background:"#0a0908", borderBottom:"1px solid #161410", display:"flex", alignItems:"center", padding:"0 14px", gap:10, flexShrink:0 }}>
-          <div style={{ display:"flex", gap:5 }}>
-            {["#ff5f57","#febc2e","#28c840"].map(c=><div key={c} style={{ width:11,height:11,borderRadius:"50%",background:c,opacity:.6 }}/>)}
+      {/* Stats ribbon */}
+      <div className="stats-ribbon">
+        {[
+          { num: "15s", label: "avg build time" },
+          { num: "200+", label: "sites launched" },
+          { num: "100%", label: "mobile ready" },
+          { num: "∞", label: "revisions" },
+        ].map((s, i) => (
+          <div key={i} className="stat-item">
+            <div className="stat-num">{s.num}</div>
+            <div className="stat-label">{s.label}</div>
           </div>
-          <div style={{ flex:1, background:"#0e0d0b", border:"1px solid #161410", borderRadius:7, height:26, display:"flex", alignItems:"center", padding:"0 10px", fontSize:11, color:"#1e1c18", overflow:"hidden", whiteSpace:"nowrap", gap:6 }}>
-            <span>🔒</span>
-            {businessName ? `${businessName.toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"")}.sitecraft.ai` : "sitecraft.ai"}
-          </div>
-          {/* Live building pulse */}
-          <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#3a3830", flexShrink:0 }}>
-            <div style={{ width:7, height:7, borderRadius:"50%", background:"#c8a96e", animation:"pulse 1.4s ease infinite" }} />
-            Building live
-          </div>
-        </div>
-        {/* iframe */}
-        <div style={{ flex:1, overflow:"hidden", background:"#111" }}>
-          <iframe ref={iframeRef} style={{ width:"100%", height:"100%", border:"none", background:"#fff" }} title="preview" sandbox="allow-scripts allow-same-origin allow-forms" />
-        </div>
+        ))}
       </div>
-
-      <style>{`
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes pulse{0%,100%{opacity:.2;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
-        *{box-sizing:border-box}
-      `}</style>
     </div>
   );
 
-  // ═══════════════════════════════════════════════════════════
+  // ========================
   // BUILDER
-  // ═══════════════════════════════════════════════════════════
+  // ========================
   return (
-    <div style={{ height:"100svh", background:"#080807", color:"#e8e0d0", fontFamily:"-apple-system,'Inter',sans-serif", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+    <div className="builder-wrap">
+      <style>{CSS}</style>
 
-      {/* ── TOP BAR ── */}
-      <div style={{ height:50, background:"#0a0908", borderBottom:"1px solid #161410", display:"flex", alignItems:"center", padding:"0 14px", gap:10, flexShrink:0, zIndex:30 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", flexShrink:0 }} onClick={handleReset}>
-          <div style={{ width:28, height:28, borderRadius:8, background:"linear-gradient(135deg,#c8a96e,#a07840)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:13, color:"#0a0a08", boxShadow:"0 2px 10px rgba(200,169,110,.2)" }}>S</div>
-          <span style={{ fontWeight:800, fontSize:15, letterSpacing:"-.3px" }}>Site<span style={{ color:"#c8a96e" }}>craft</span></span>
+      <div className="builder-topbar">
+        <div className="logo">
+          <div className="logo-mark" style={{ width: 26, height: 26, fontSize: 12 }}>S</div>
+          <div className="logo-text" style={{ fontSize: 14 }}>Site<span>craft</span></div>
         </div>
-        <div style={{ width:1, height:18, background:"#1a1810", flexShrink:0 }} />
-        <div style={{ fontSize:13, color:"#2e2c28", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1, minWidth:0 }}>{businessName}</div>
-
-        {/* Device switcher */}
-        <div style={{ display:"flex", gap:2, background:"#0e0d0b", border:"1px solid #1a1810", borderRadius:8, padding:3, flexShrink:0 }}>
+        <div style={{ width: 1, height: 18, background: "#1a1810", margin: "0 2px" }} />
+        <div style={{ fontSize: 13, color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{businessName}</div>
+        <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
           {(["desktop","tablet","mobile"] as const).map(d => (
-            <button key={d} onClick={() => setDevice(d)}
-              title={d}
-              style={{ width:30, height:26, borderRadius:6, border:"none", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", background: device===d ? "rgba(200,169,110,.1)" : "transparent", transition:"all .15s" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={device===d?"#c8a96e":"#333"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d={icoS(d)}/>
-              </svg>
+            <button key={d} className={`device-btn${device===d?" active":""}`} onClick={() => setDevice(d)} title={d}>
+              {d==="desktop"?"🖥":d==="tablet"?"⬜":"📱"}
             </button>
           ))}
         </div>
-
-        <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-          <button onClick={() => setPanelOpen(p=>!p)}
-            style={{ height:32, padding:"0 13px", borderRadius:8, border:"1px solid #1a1810", background:"transparent", color:"#3a3830", cursor:"pointer", fontSize:12, fontFamily:"inherit", transition:"all .15s" }}
-            onMouseEnter={e=>{e.currentTarget.style.color="#e8e0d0";}} onMouseLeave={e=>{e.currentTarget.style.color="#3a3830";}}>
-            {panelOpen ? "◂ Hide" : "Chat ▸"}
-          </button>
-          <button onClick={handleReset}
-            style={{ height:32, padding:"0 13px", borderRadius:8, border:"1px solid #1a1810", background:"transparent", color:"#3a3830", cursor:"pointer", fontSize:12, fontFamily:"inherit", transition:"all .15s" }}
-            onMouseEnter={e=>{e.currentTarget.style.color="#e8e0d0";e.currentTarget.style.borderColor="#2a2820";}} onMouseLeave={e=>{e.currentTarget.style.color="#3a3830";e.currentTarget.style.borderColor="#1a1810";}}>
-            New
-          </button>
-          <button
-            onClick={() => { if (!siteHtml) return; const b=new Blob([siteHtml],{type:"text/html"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=`${businessName||"sitecraft"}.html`; a.click(); }}
-            style={{ height:32, padding:"0 14px", borderRadius:8, border:"1px solid rgba(200,169,110,.18)", background:"rgba(200,169,110,.05)", color:"#c8a96e", cursor:"pointer", fontSize:12, fontFamily:"inherit", fontWeight:600, transition:"all .15s" }}
-            onMouseEnter={e=>{e.currentTarget.style.background="rgba(200,169,110,.1)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(200,169,110,.05)";}}>
-            ↓ Download
-          </button>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          <button className="btn-ghost" style={{ padding: "6px 12px", fontSize: 13 }} onClick={() => { setAppState("landing"); setMessages([]); setSiteHtml(""); setLandingInput(""); historyRef.current = []; }}>New</button>
+          <button className="btn-gold" style={{ padding: "7px 14px", fontSize: 13 }} onClick={() => router.push("/build")}>Edit & Publish →</button>
         </div>
       </div>
 
-      {/* ── BODY ── */}
-      <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
+      <div className="builder-body">
+        <div className="chat-panel">
+          <div className="chat-messages">
+            {messages.map(m => (
+              <div key={m.id} className={`msg-bubble ${m.role==="user"?"msg-user":"msg-ai"}`}>{m.content}</div>
+            ))}
+            {generating && (
+              <div className="typing-wrap">
+                {[0,1,2].map(i => <div key={i} className="typing-dot" style={{ animation: `pulse 1.2s ease ${i*.2}s infinite` }} />)}
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
 
-        {/* ── CHAT PANEL ── */}
-        {panelOpen && (
-          <div style={{ width:290, flexShrink:0, display:"flex", flexDirection:"column", background:"#0a0908", borderRight:"1px solid #161410" }}>
-            <div style={{ flex:1, overflowY:"auto", padding:"14px 12px", display:"flex", flexDirection:"column", gap:9 }}>
-              {messages.map(m => (
-                <div key={m.id} style={{ animation:"slideIn .2s ease", alignSelf: m.role==="user"?"flex-end":"flex-start", maxWidth:"88%", padding:"9px 13px", fontSize:13, lineHeight:1.65, borderRadius: m.role==="user"?"14px 14px 3px 14px":"14px 14px 14px 3px", background: m.role==="user"?"linear-gradient(135deg,#c8a96e,#b09050)":"#111", color: m.role==="user"?"#0a0a08":"#b0a898", fontWeight: m.role==="user"?500:400, border: m.role==="user"?"none":"1px solid #1a1810", boxShadow: m.role==="user"?"0 2px 8px rgba(200,169,110,.15)":"none" }}>
-                  {m.content}
-                </div>
-              ))}
-              {generating && (
-                <div style={{ alignSelf:"flex-start", background:"#111", border:"1px solid #1a1810", borderRadius:"14px 14px 14px 3px", padding:"12px 16px", display:"flex", gap:5 }}>
-                  {[0,1,2].map(i=><div key={i} style={{ width:6,height:6,borderRadius:"50%",background:"#c8a96e",animation:`pulse 1.2s ease ${i*.2}s infinite` }}/>)}
-                </div>
-              )}
-              <div ref={chatEndRef}/>
-            </div>
-
-            {messages.length>=2 && !generating && (
-              <div style={{ padding:"6px 10px 0", display:"flex", gap:6, overflowX:"auto", scrollbarWidth:"none" }}>
-                {QUICK_EDITS.map((q,i)=>(
-                  <button key={i} onClick={()=>{setChatInput(q);chatTaRef.current?.focus();}}
-                    style={{ background:"transparent", border:"1px solid #1a1810", borderRadius:16, padding:"5px 11px", fontSize:11, color:"#2e2c28", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap", flexShrink:0, transition:"all .15s" }}
-                    onMouseEnter={e=>{const b=e.currentTarget;b.style.borderColor="rgba(200,169,110,.2)";b.style.color="#c8a96e";}}
-                    onMouseLeave={e=>{const b=e.currentTarget;b.style.borderColor="#1a1810";b.style.color="#2e2c28";}}>
-                    {q}
-                  </button>
+          {messages.length >= 2 && !generating && (
+            <div style={{ padding: "4px 10px 0" }}>
+              <div className="quick-edits">
+                {QUICK_EDITS.map((q, i) => (
+                  <button key={i} className="quick-chip" onClick={() => { setChatInput(q); chatTaRef.current?.focus(); }}>{q}</button>
                 ))}
               </div>
-            )}
+            </div>
+          )}
 
-            <div style={{ padding:"10px 10px 14px", borderTop:"1px solid #161410", flexShrink:0 }}>
-              <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
-                <textarea ref={chatTaRef} rows={1} placeholder={generating?"Updating…":"Change anything…"} value={chatInput} disabled={generating}
-                  onChange={e=>{setChatInput(e.target.value);e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,100)+"px";}}
-                  onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleChatSend();}}}
-                  onFocus={e=>{e.target.style.borderColor="rgba(200,169,110,.3)";}}
-                  onBlur={e=>{e.target.style.borderColor="#1a1810";}}
-                  style={{ flex:1, background:"#0d0c0a", border:"1px solid #1a1810", borderRadius:10, padding:"10px 12px", color:"#e8e0d0", fontSize:14, fontFamily:"inherit", resize:"none", outline:"none", lineHeight:1.5, maxHeight:100, transition:"border-color .15s", opacity:generating?.5:1 }}
-                />
-                <button onClick={handleChatSend} disabled={!chatInput.trim()||generating}
-                  style={{ width:38, height:38, borderRadius:10, background: chatInput.trim()&&!generating?"linear-gradient(135deg,#c8a96e,#a87030)":"#151310", border:"none", cursor: chatInput.trim()&&!generating?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, fontWeight:700, color: chatInput.trim()&&!generating?"#0a0a08":"#252220", flexShrink:0, transition:"all .15s", boxShadow: chatInput.trim()&&!generating?"0 2px 10px rgba(200,169,110,.2)":"none" }}>
-                  →
-                </button>
-              </div>
+          <div className="chat-input-area">
+            <div className="chat-input-row">
+              <textarea
+                ref={chatTaRef}
+                className="chat-ta"
+                rows={1}
+                placeholder={generating ? "Working on it…" : "Ask me to change anything…"}
+                value={chatInput}
+                disabled={generating}
+                onChange={e => { setChatInput(e.target.value); autoResize(e.target); }}
+                onKeyDown={e => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
+                style={{ fontSize: "16px" }}
+              />
+              <button className="chat-send-btn" onClick={handleChatSend} disabled={!chatInput.trim()||generating}>↗</button>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* ── PREVIEW ── */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, position:"relative" }}>
-          {/* Browser bar */}
-          <div style={{ height:38, background:"#0a0908", borderBottom:"1px solid #161410", display:"flex", alignItems:"center", padding:"0 12px", gap:10, flexShrink:0 }}>
-            <div style={{ display:"flex", gap:5 }}>
-              {["#ff5f57","#febc2e","#28c840"].map(c=><div key={c} style={{ width:11,height:11,borderRadius:"50%",background:c,opacity:.7 }}/>)}
+        <div className="preview-panel">
+          <div className="preview-bar">
+            <div className="preview-dots">
+              {["#ff5f57","#febc2e","#28c840"].map(c => <div key={c} style={{ width:10,height:10,borderRadius:"50%",background:c }} />)}
             </div>
-            <div style={{ flex:1, background:"#0e0d0b", border:"1px solid #161410", borderRadius:7, height:26, display:"flex", alignItems:"center", padding:"0 10px", fontSize:11, color:"#1e1c18", gap:5, overflow:"hidden", whiteSpace:"nowrap", minWidth:0 }}>
-              <span style={{ opacity:.5 }}>🔒</span>
-              {businessName?`${businessName.toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"")}.sitecraft.ai`:"sitecraft.ai"}
+            <div className="url-bar">
+              {businessName ? `${businessName.toLowerCase().replace(/[^a-z0-9]/g,"")}.sitecraft.ai` : "sitecraft.ai"}
             </div>
-            {generating&&siteHtml&&(
-              <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:"#3a3830", flexShrink:0 }}>
-                <div style={{ width:12,height:12,borderRadius:"50%",border:"2px solid #1a1810",borderTopColor:"#c8a96e",animation:"spin 1s linear infinite" }}/>
-                Updating
-              </div>
-            )}
           </div>
-          <div style={{ flex:1, overflow:"auto", display:"flex", justifyContent:"center", background: device!=="desktop"?"#070706":"#111", padding:device!=="desktop"?"20px":0 }}>
-            {!siteHtml&&!generating&&(
-              <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:10, color:"#1e1c18", pointerEvents:"none" }}>
-                <div style={{ fontSize:36 }}>🏗</div>
-                <div style={{ fontSize:13 }}>Your site will appear here</div>
+
+          {generating && !siteHtml && (
+            <div className="gen-overlay">
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, textAlign:"center" }}>
+                <div className="logo-mark" style={{ width:48, height:48, fontSize:22, marginBottom:4 }}>S</div>
+                <div style={{ fontSize:17, fontWeight:800, color:"#e8e0d0" }}>Building your site</div>
+                <div style={{ fontSize:13, color:"#555" }}>~15 seconds</div>
               </div>
-            )}
-            <iframe ref={iframeRef}
-              style={{ width:previewWidth, height:device!=="desktop"?"calc(100svh - 130px)":"100%", border:"none", background:"#fff", borderRadius:device!=="desktop"?10:0, boxShadow:device!=="desktop"?"0 8px 50px rgba(0,0,0,.5)":"none", flexShrink:0, transition:"width .3s ease" }}
-              title="preview" sandbox="allow-scripts allow-same-origin allow-forms"
+              <div style={{ display:"flex", flexDirection:"column", gap:10, minWidth:220 }}>
+                {GEN_STEPS.map((s, i) => (
+                  <div key={i} className={`gen-step${i===genStep?" active":i<genStep?" done":""}`}>
+                    <div className="gen-dot" />
+                    {s}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {generating && siteHtml && (
+            <div style={{ position:"absolute", top:46, right:12, zIndex:10, background:"#0a0a08", border:"1px solid #1a1810", borderRadius:10, padding:"7px 13px", display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#777" }}>
+              <div style={{ width:13,height:13,borderRadius:"50%",border:"2px solid #1a1810",borderTopColor:"#c8a96e",animation:"spin 1s linear infinite" }} />
+              Updating…
+            </div>
+          )}
+
+          <div style={{ flex:1, overflow:"auto", display:"flex", justifyContent:"center", background:device!=="desktop"?"#1a1810":"#111", padding:device!=="desktop"?"16px":"0" }}>
+            <iframe
+              ref={iframeRef}
+              style={{ width:previewWidth, height:device!=="desktop"?"calc(100svh - 130px)":"100%", border:"none", background:"#fff", borderRadius:device!=="desktop"?"8px":"0", boxShadow:device!=="desktop"?"0 4px 40px rgba(0,0,0,.5)":"none", transition:"width .3s ease", flexShrink:0 }}
+              title="preview"
+              sandbox="allow-scripts allow-same-origin allow-forms"
             />
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes pulse{0%,100%{opacity:.2;transform:scale(.6)}50%{opacity:1;transform:scale(1)}}
-        @keyframes slideIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-        *{box-sizing:border-box}
-        ::-webkit-scrollbar{width:3px;height:3px}
-        ::-webkit-scrollbar-thumb{background:#1a1810;border-radius:3px}
-      `}</style>
     </div>
   );
 }
