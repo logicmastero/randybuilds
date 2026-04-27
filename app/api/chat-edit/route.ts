@@ -4,7 +4,7 @@ import { injectThemeToggle } from "@/lib/theme-injector";
 import { injectSEOMeta } from "@/lib/seo-injector";
 import { injectEmailCaptureForm } from "@/lib/form-injector";
 
-export const maxDuration = 90;
+export const maxDuration = 60;
 
 interface Message {
   role: "user" | "assistant";
@@ -269,7 +269,7 @@ Make this change precisely. Return the complete updated HTML as JSON.`;
     conversationMessages.push({ role: "user", content: userContent });
 
     const response = await client.messages.create({
-      model: "claude-opus-4-5",
+      model: "claude-opus-4-7",
       max_tokens: isBuildFromScratch ? 12000 : 8000,
       system: systemPrompt,
       messages: conversationMessages,
