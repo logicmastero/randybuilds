@@ -23,6 +23,7 @@ interface Site {
   seo_description?: string;
   analytics_id?: string;
   password_protected?: boolean;
+  site_password?: string;
 }
 
 interface User {
