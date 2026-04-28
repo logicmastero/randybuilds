@@ -374,7 +374,64 @@ export default function Home() {
   // ========================
   if (appState === "landing") return (
     <div className="landing-root">
-      <style>{CSS}</style>
+      <style>{CSS}
+
+/* ===== MOBILE OPTIMIZATIONS (Android / all small screens) ===== */
+@media(max-width:480px) {
+  /* Nav: hide text links, keep logo + CTA */
+  .nav-links .nav-link { display:none; }
+  .landing-nav { padding:0 16px; }
+  
+  /* Hero: allow scrolling, reduce padding */
+  html, body { overflow:auto; }
+  .landing-root { height:auto; min-height:100svh; overflow-y:auto; }
+  .landing-left { padding:20px 16px 28px; justify-content:flex-start; overflow-y:visible; }
+  
+  /* Typography: tighter letter spacing fix */
+  .hero-headline { font-size:clamp(26px,8vw,40px); letter-spacing:-1px; }
+  .hero-sub { font-size:14px; margin-bottom:24px; max-width:100%; }
+  
+  /* Input: force 16px to prevent zoom, full width */
+  .main-input { font-size:16px !important; padding:14px 52px 14px 14px; }
+  .main-input-wrap { max-width:100%; }
+  
+  /* Suggestions: smaller chips, more wrap */
+  .sug-chip { font-size:11px; padding:6px 11px; }
+  .suggestions-row { gap:5px; }
+  
+  /* Stats ribbon: tighten */
+  .stats-ribbon { padding:12px 16px; gap:0; }
+  .stat-num { font-size:15px; }
+  .stat-label { font-size:9px; }
+  
+  /* Social proof: stack on very small */
+  .social-proof { gap:10px; margin-top:20px; }
+  .proof-text { font-size:11px; }
+}
+
+@media(max-width:360px) {
+  .hero-headline { font-size:24px; }
+  .landing-left { padding:16px 14px 24px; }
+  .sug-chip { font-size:10.5px; padding:5px 9px; }
+}
+
+/* ===== BUILD PAGE MOBILE ===== */
+@media(max-width:640px) {
+  /* Builder body: full height for preview */
+  .builder-body { flex-direction:column; }
+  .chat-panel { display:none; }
+  .preview-panel { flex:1; min-height:0; }
+  
+  /* Topbar: tighter on mobile */
+  .builder-topbar { padding:0 8px; gap:5px; }
+  
+  /* Preview bar: hide device buttons */
+  .preview-bar .device-btn:not(.active) { display:none; }
+  
+  /* Input fields: prevent zoom */
+  input, textarea, select { font-size:16px !important; }
+}
+`</style>
 
       {/* Nav */}
       <nav className="landing-nav">

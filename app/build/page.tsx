@@ -301,24 +301,42 @@ export default function BuilderPage() {
         @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
         @keyframes slideIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
         @keyframes slideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
-        /* Mobile */
+        /* Mobile — comprehensive Android/iOS support */
         @media(max-width:640px){
+          /* Hide desktop panels */
           .sc-left-panel{display:none!important}
           .sc-right-panel{display:none!important}
           .sc-desktop-only{display:none!important}
+          /* Show mobile FABs and sheets */
           .sc-mobile-fab{display:flex!important}
-          .sc-mobile-sheet{display:flex!important}
+          /* Topbar: tighter spacing */
+          .sc-topbar-title{display:none!important}
+          /* Preview: full viewport height */
+          .sc-preview-center{height:calc(100svh - 48px)!important;width:100vw!important}
+          /* Iframe: full width, no device chrome constraints */
+          .sc-preview-iframe{width:100%!important;height:100%!important;max-width:100%!important}
+          /* Body layout: preview takes full screen */
+          .sc-body{overflow:hidden!important}
         }
         @media(min-width:641px){
           .sc-mobile-only{display:none!important}
           .sc-mobile-fab{display:none!important}
         }
-        .sc-mobile-fab{display:none;position:fixed;bottom:20px;right:16px;gap:10px;z-index:80}
-        .sc-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:90;backdrop-filter:blur(4px)}
-        .sc-bottom-sheet{position:fixed;bottom:0;left:0;right:0;background:#0a0a08;border-top:1px solid #1a1810;border-radius:20px 20px 0 0;z-index:100;animation:slideUp .25s ease;max-height:85svh;display:flex;flex-direction:column;overflow:hidden}
-        .sc-sheet-handle{width:36px;height:4px;background:#222;border-radius:2px;margin:12px auto 4px}
-        .chat-ta{font-size:16px!important}
-        input,select{font-size:16px!important}
+        /* FAB buttons */
+        .sc-mobile-fab{display:none;position:fixed;bottom:24px;right:16px;flex-direction:column;gap:10px;z-index:80;align-items:flex-end}
+        /* Bottom sheet */
+        .sc-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:90;backdrop-filter:blur(6px)}
+        .sc-bottom-sheet{position:fixed;bottom:0;left:0;right:0;background:#0a0a08;border-top:1px solid #1a1810;border-radius:20px 20px 0 0;z-index:100;animation:slideUp .25s ease;max-height:88svh;display:flex;flex-direction:column;overflow:hidden}
+        .sc-sheet-handle{width:40px;height:4px;background:#222;border-radius:2px;margin:12px auto 6px;flex-shrink:0}
+        /* Prevent zoom on input focus (Android critical) */
+        .chat-ta{font-size:16px!important;-webkit-text-size-adjust:100%}
+        input,select,textarea{font-size:16px!important;-webkit-text-size-adjust:100%}
+        /* Touch targets: min 44px */
+        button{min-height:36px}
+        /* Safe area for notched phones */
+        .sc-bottom-sheet{padding-bottom:env(safe-area-inset-bottom,0px)}
+        /* Smooth momentum scrolling */
+        .sc-sheet-messages{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
       `}</style>
 
       {/* ── TOPBAR ── */}
@@ -364,7 +382,7 @@ export default function BuilderPage() {
       </div>
 
       {/* ── BODY ── */}
-      <div style={S.body}>
+      <div className="sc-body" style={S.body}>
 
         {/* ── LEFT SIDEBAR ── */}
         <div className="sc-left-panel" style={S.sidebar(leftOpen)}>
@@ -398,7 +416,7 @@ export default function BuilderPage() {
         </div>
 
         {/* ── CENTER: PREVIEW ── */}
-        <div style={S.center}>
+        <div className="sc-preview-center" style={S.center}>
           {/* Device frame */}
           <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: device === "desktop" ? "stretch" : "flex-start", justifyContent: "center", padding: device === "desktop" ? 0 : "24px", background: device === "desktop" ? "#070706" : "#050504" }}>
             <div style={{ width: DEVICE_W[device], maxWidth: device === "desktop" ? "100%" : DEVICE_W[device], height: device === "desktop" ? "100%" : DEVICE_H[device], boxShadow: device !== "desktop" ? "0 24px 64px rgba(0,0,0,0.7)" : "none", borderRadius: device !== "desktop" ? 18 : 0, overflow: "hidden", border: device !== "desktop" ? "1px solid #1a1810" : "none", background: "#fff", position: "relative" }}>
@@ -408,7 +426,7 @@ export default function BuilderPage() {
                 </div>
               )}
               <iframe
-                ref={iframeRef}
+                ref={iframeRef} className="sc-preview-iframe"
                 style={{ width: "100%", height: "100%", border: "none", display: "block", cursor: visualMode ? "text" : "default" }}
                 title="preview"
                 sandbox="allow-scripts allow-same-origin allow-forms"
