@@ -259,6 +259,7 @@ export default function BuilderPage() {
   };
 
   const DEVICE_W = { desktop: "100%", tablet: "768px", mobile: "390px" };
+  const isMobileScreen = typeof window !== "undefined" && window.innerWidth < 641;
   const DEVICE_H = { desktop: "100%", tablet: "1024px", mobile: "844px" };
 
   const cssVars = extractCSSVars(site.html);
@@ -366,7 +367,7 @@ export default function BuilderPage() {
       <div style={S.body}>
 
         {/* ── LEFT SIDEBAR ── */}
-        <div style={S.sidebar(leftOpen)}>
+        <div className="sc-left-panel" style={S.sidebar(leftOpen)}>
           {leftOpen && (
             <>
               <div style={S.sectionLabel}>Site Structure</div>
@@ -417,7 +418,7 @@ export default function BuilderPage() {
         </div>
 
         {/* ── RIGHT PANEL ── */}
-        <div style={S.right(rightOpen)}>
+        <div className="sc-right-panel" style={S.right(rightOpen)}>
           {rightOpen && (
             <>
               {/* Tab bar */}
@@ -570,6 +571,87 @@ export default function BuilderPage() {
           )}
         </div>
       </div>
+
+
+      {/* ── MOBILE FABs ── */}
+      <div className="sc-mobile-fab">
+        <button
+          onClick={() => { setMobileChatOpen(true); setMobilePanelOpen(false); }}
+          style={{ width: 48, height: 48, borderRadius: "50%", background: "#c8a96e", border: "none", color: "#0a0a08", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(200,169,110,0.4)" }}
+        >💬</button>
+        <button
+          onClick={() => { setMobilePanelOpen(true); setMobileChatOpen(false); }}
+          style={{ width: 48, height: 48, borderRadius: "50%", background: "#111", border: "1px solid #1a1810", color: "#e8e0d0", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }}
+        >🎨</button>
+      </div>
+
+      {/* ── MOBILE CHAT SHEET ── */}
+      {mobileChatOpen && (
+        <div className="sc-sheet-overlay" onClick={() => setMobileChatOpen(false)}>
+          <div className="sc-bottom-sheet" onClick={e => e.stopPropagation()}>
+            <div className="sc-sheet-handle" />
+            <div style={{ padding: "0 16px 8px", fontWeight: 700, fontSize: 14, color: "#e8e0d0", borderBottom: "1px solid #111", paddingBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>💬 Chat with Sitecraft</span>
+              <button onClick={() => setMobileChatOpen(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {messages.map((m, i) => (
+                <div key={i} className={m.role === "user" ? "msg-user" : "msg-ai"} style={{ padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
+                  {m.content}
+                </div>
+              ))}
+              {sending && <div className="msg-ai" style={{ padding: "10px 14px", fontSize: 13 }}>✦ Thinking…</div>}
+            </div>
+            <div style={{ padding: "10px 16px 20px", borderTop: "1px solid #111", background: "#0a0a08" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <textarea
+                  className="chat-ta"
+                  rows={2}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); setMobileChatOpen(false); } }}
+                  placeholder="Change anything… Enter to send"
+                  style={{ flex: 1 }}
+                />
+                <button onClick={() => { sendMessage(); setMobileChatOpen(false); }} disabled={sending} style={{ background: "#c8a96e", border: "none", color: "#0a0a08", fontWeight: 700, fontSize: 15, borderRadius: 8, padding: "10px 14px", cursor: "pointer", opacity: sending ? 0.4 : 1 }}>→</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MOBILE DESIGN SHEET ── */}
+      {mobilePanelOpen && (
+        <div className="sc-sheet-overlay" onClick={() => setMobilePanelOpen(false)}>
+          <div className="sc-bottom-sheet" onClick={e => e.stopPropagation()}>
+            <div className="sc-sheet-handle" />
+            <div style={{ padding: "0 16px 10px", fontWeight: 700, fontSize: 14, color: "#e8e0d0", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>🎨 Design</span>
+              <button onClick={() => setMobilePanelOpen(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px" }}>
+              <div style={{ marginBottom: 14, fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: 1, textTransform: "uppercase" }}>Color Palettes</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
+                {PALETTES.map(p => (
+                  <button key={p.name} className="sc-palette" onClick={() => { applyPalette(p); setMobilePanelOpen(false); }} style={{ padding: "10px 12px", border: "1px solid #1a1810", borderRadius: 8, cursor: "pointer", background: "#111", display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 16, height: 16, borderRadius: "50%", background: p.primary, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "#e8e0d0", fontWeight: 600 }}>{p.name}</span>
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginBottom: 14, fontSize: 11, fontWeight: 700, color: "#555", letterSpacing: 1, textTransform: "uppercase" }}>Fonts</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {FONTS.slice(0, 6).map(f => (
+                  <button key={f.name} onClick={() => { applyFont(f); setMobilePanelOpen(false); }} style={{ padding: "10px 14px", background: "#111", border: "1px solid #1a1810", borderRadius: 8, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontFamily: f.stack, fontSize: 14, color: "#e8e0d0" }}>Aa — {f.name}</span>
+                    <span style={{ fontSize: 10, color: "#444" }}>Apply</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── PUBLISH MODAL ── */}
       {showPublish && (
