@@ -109,7 +109,7 @@ const PLANS = [
     tier: "Starter",
     price: 800,
     period: "CAD one-time",
-    desc: "Perfect for tradespeople and small local businesses who need a clean, professional online presence fast.",
+    desc: "Perfect for creators, freelancers, and small businesses who need a clean, professional site fast.",
     feats: [
       { t: "5-page professional site", d: "Home, About, Services, Gallery, Contact" },
       { t: "Mobile-first design", d: "Looks perfect on every device" },

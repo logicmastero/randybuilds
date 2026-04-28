@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       <tr><td style="padding:24px 48px;border-top:1px solid rgba(255,255,255,0.06)">
         <div style="font-size:12px;color:rgba(232,226,216,0.3);line-height:1.6">
           You're receiving this because you just signed up for Sitecraft.<br>
-          Alberta, Canada · <a href="mailto:hello@sitecraftai.com" style="color:rgba(232,226,216,0.3)">hello@sitecraftai.com</a>
+          "mailto:hello@sitecraftai.com" style="color:rgba(232,226,216,0.3)">hello@sitecraftai.com</a>
         </div>
       </td></tr>
 

@@ -14,68 +14,68 @@ interface Message {
 
 const PREVIEW_SITES = [
   {
-    label: "Plumber · Calgary",
-    bg: "#0d1f35",
-    accent: "#4a9eff",
-    emoji: "🔧",
-    hero: "Rocky Mountain Plumbing",
-    sub: "Residential & Commercial · Calgary, AB",
-    tags: ["24/7 Emergency", "Licensed & Insured", "Free Quotes"],
-    stat: "500+ jobs completed",
+    label: "Tattoo Studio",
+    bg: "#0d0d0d",
+    accent: "#e8335a",
+    emoji: "🖤",
+    hero: "Darkline Tattoo Co.",
+    sub: "Custom Ink · Walk-ins Welcome",
+    tags: ["Custom Designs", "Cover-ups", "All Styles"],
+    stat: "2,000+ pieces done",
   },
   {
-    label: "Landscaper · Edmonton",
-    bg: "#0d2010",
-    accent: "#5dba5d",
-    emoji: "🌿",
-    hero: "GreenEdge Landscaping",
-    sub: "Design, Build & Maintain · Edmonton, AB",
-    tags: ["Lawn Care", "Snow Removal", "Irrigation"],
-    stat: "Serving Edmonton since 2015",
+    label: "Music Producer",
+    bg: "#0a0a1a",
+    accent: "#9d6fff",
+    emoji: "🎧",
+    hero: "MNRCH Beats",
+    sub: "Trap · Hip-Hop · Electronic",
+    tags: ["Exclusive Leases", "Full Trackouts", "Mixing & Mastering"],
+    stat: "500+ artists worked with",
   },
   {
-    label: "Physio · Calgary",
-    bg: "#1f0d1e",
-    accent: "#c06ebb",
+    label: "Freelance Designer",
+    bg: "#0d1520",
+    accent: "#00c9ff",
+    emoji: "✦",
+    hero: "Studio Flux",
+    sub: "Brand Identity · Web · Motion",
+    tags: ["Branding", "UI/UX", "Figma"],
+    stat: "4.9★ across 120+ clients",
+  },
+  {
+    label: "Personal Trainer",
+    bg: "#0d0a00",
+    accent: "#f5a623",
     emoji: "💪",
-    hero: "Peak Performance Physio",
-    sub: "Sports Rehab & Injury Recovery · Calgary",
-    tags: ["IMS Certified", "Direct Billing", "Online Booking"],
-    stat: "4.9★ on Google",
+    hero: "MVMNT by Jay",
+    sub: "Online & In-Person Coaching",
+    tags: ["1-on-1 Programs", "Nutrition Plans", "Free Consult"],
+    stat: "300+ transformations",
   },
   {
-    label: "Electrician · Cochrane",
-    bg: "#201500",
-    accent: "#e8a020",
-    emoji: "⚡",
-    hero: "Apex Electrical",
-    sub: "Licensed Electrician · Cochrane & Calgary",
-    tags: ["Panel Upgrades", "EV Chargers", "Free Estimates"],
-    stat: "Master Electrician on every job",
-  },
-  {
-    label: "HVAC · Airdrie",
-    bg: "#0e0e2a",
-    accent: "#7070e8",
-    emoji: "❄️",
-    hero: "PrairieAir HVAC",
-    sub: "Furnace, AC & Ventilation · Airdrie, AB",
-    tags: ["24/7 Service", "All Brands", "Financing Available"],
-    stat: "1,200+ systems installed",
+    label: "Coffee Shop",
+    bg: "#110a05",
+    accent: "#c8845a",
+    emoji: "☕",
+    hero: "Third Wave Coffee Roasters",
+    sub: "Single Origin · Pour Over · Cold Brew",
+    tags: ["Ethically Sourced", "Freshly Roasted", "Subscription"],
+    stat: "Roasting since 2018",
   },
 ];
 
 const PROMPT_SUGGESTIONS = [
-  { label: "🔧 Plumber", value: "Rocky Mountain Plumbing — residential & commercial plumbing in Calgary AB" },
-  { label: "⚡ Electrician", value: "Apex Electrical — licensed electrician serving Edmonton and surrounding areas" },
-  { label: "❄️ HVAC", value: "PrairieAir HVAC — furnace repair and AC installation across Alberta" },
-  { label: "🌿 Landscaping", value: "GreenEdge Landscaping — design, build & maintain. Calgary & Cochrane" },
-  { label: "🏗️ Construction", value: "Finlay Construction — custom builds and basement renovations, Cochrane AB" },
-  { label: "💪 Physiotherapy", value: "Peak Performance Physiotherapy — sports rehab and injury recovery, Calgary" },
-  { label: "📸 Photography", value: "Prairie Light Photography — wedding and portrait photographer, Alberta" },
-  { label: "🐾 Pet Grooming", value: "Paw & Claw Pet Grooming — mobile grooming services across Calgary" },
-  { label: "🏋️ Personal Training", value: "Iron Valley Fitness — personal training and group classes, Lethbridge AB" },
-  { label: "🍕 Restaurant", value: "Cochrane Pizza Co. — artisan wood-fired pizza and pasta, Cochrane AB" },
+  { label: "🖤 Tattoo Studio", value: "Darkline Tattoo — custom tattoo studio, walk-ins welcome, all styles" },
+  { label: "🎧 Music Producer", value: "MNRCH Beats — trap and hip-hop producer, selling beats online" },
+  { label: "✦ Designer", value: "Studio Flux — freelance brand identity and web designer" },
+  { label: "📸 Photographer", value: "Lens & Light — wedding and portrait photographer" },
+  { label: "💪 Personal Trainer", value: "MVMNT by Jay — online fitness coaching and transformation programs" },
+  { label: "☕ Coffee Shop", value: "Third Wave Coffee Roasters — specialty coffee, single origin beans" },
+  { label: "🎨 Artist", value: "Maya Osei Art — original paintings and prints available online" },
+  { label: "🍕 Restaurant", value: "Pasta & Co. — handmade pasta, wood-fired pizza, dine-in and takeout" },
+  { label: "💅 Nail Studio", value: "Luxe Nails — nail art studio, gel and acrylic extensions" },
+  { label: "🎤 Podcast", value: "The Grind Daily — weekly podcast about entrepreneurship and mindset" },
 ];
 
 const QUICK_EDITS = [
@@ -397,7 +397,7 @@ export default function Home() {
         <div className="landing-left">
           <div className="hero-badge">
             <span className="hero-dot" />
-            AI website builder for Alberta businesses
+            The fastest way to build a website
           </div>
 
           <h1 className="hero-headline">
@@ -415,7 +415,7 @@ export default function Home() {
               ref={landingRef}
               className="main-input"
               rows={2}
-              placeholder="e.g. Rocky Mountain Plumbing — residential and commercial plumbing in Calgary AB"
+              placeholder="e.g. Darkline Tattoo — custom tattoo studio, walk-ins welcome"
               value={landingInput}
               onChange={e => { setLandingInput(e.target.value); autoResize(e.target); }}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleLaunch(); } }}
@@ -446,7 +446,7 @@ export default function Home() {
               ))}
             </div>
             <div className="proof-text">
-              <strong>200+ Alberta businesses</strong> launched their site with Sitecraft
+              <strong>500+ creators &amp; businesses</strong> launched their site with Sitecraft
             </div>
           </div>
         </div>

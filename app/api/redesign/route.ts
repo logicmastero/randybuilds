@@ -374,7 +374,7 @@ function buildFallbackCopy(data: ScrapedInput, vertical?: VerticalProfile): Rede
       "roofing contractor":             "Certified roofers protecting homes across the region — built to last decades.",
       "electrical contractor":          "Code-compliant electrical work completed safely, on schedule, and on budget.",
       "hvac contractor":                "Heating and cooling systems installed and serviced by certified technicians.",
-      "general contractor / construction": "Quality builds delivered on time, on budget, by tradespeople who take pride in it.",
+      "general contractor / construction": "Quality builds delivered on time, on budget, by creators who take pride in it.",
       "local service business":         "Serving the community with work that speaks for itself — every single job.",
     };
     const labelKey = v.label.toLowerCase();

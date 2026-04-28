@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   description: "Paste your URL. See your new premium website in 60 seconds. AI-powered web design for serious businesses — no agency, no templates, no guesswork.",
   keywords: [
     "AI web design", "website builder", "premium website", "small business website",
-    "Alberta web design", "instant website", "AI generated website", "Sitecraft",
+    "AI website builder", "instant website", "vibe coding", "Sitecraft", "build a website fast",
   ],
   authors: [{ name: "Sitecraft" }],
   creator: "Sitecraft",

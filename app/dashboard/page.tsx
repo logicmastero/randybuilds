@@ -193,7 +193,7 @@ function SiteSettings({ site, onSave, saving }: { site: Site; onSave: (data: Par
             </Field>
 
             <Field label="Description" hint="A short description of your business">
-              <Textarea value={form.description} onChange={v => update("description", v)} placeholder="Residential and commercial plumbing services in Calgary, AB" />
+              <Textarea value={form.description} onChange={v => update("description", v)} placeholder="e.g. Custom tattoo studio — walk-ins welcome, all styles" />
             </Field>
 
             <Field label="Status">
@@ -303,12 +303,12 @@ function SiteSettings({ site, onSave, saving }: { site: Site; onSave: (data: Par
             </div>
 
             <Field label="SEO Title" hint="Shown in browser tab and Google results (50–60 chars)">
-              <Input value={form.seo_title} onChange={v => update("seo_title", v)} placeholder={`${form.business_name || "My Business"} — Calgary, AB`} maxLength={60} />
+              <Input value={form.seo_title} onChange={v => update("seo_title", v)} placeholder={`${form.business_name || "My Business"} — The tagline for your site`} maxLength={60} />
               <CharCount value={form.seo_title} max={60} />
             </Field>
 
             <Field label="Meta Description" hint="Shown under the link in Google results (150–160 chars)">
-              <Textarea value={form.seo_description} onChange={v => update("seo_description", v)} placeholder="Professional plumbing services in Calgary. Available 24/7 for emergencies. Call for a free estimate." maxLength={160} />
+              <Textarea value={form.seo_description} onChange={v => update("seo_description", v)} placeholder="e.g. Book online, view our work, and get in touch — we'd love to work with you." maxLength={160} />
               <CharCount value={form.seo_description} max={160} />
             </Field>
 

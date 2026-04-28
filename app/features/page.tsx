@@ -112,7 +112,7 @@ export default function FeaturesPage() {
       </section>
 
       <footer style={{ borderTop: "1px solid #111", padding: "32px 24px", textAlign: "center" as const }}>
-        <div style={{ fontSize: 12, color: "#333" }}>© 2026 Sitecraft · Built in Alberta, Canada</div>
+        <div style={{ fontSize: 12, color: "#333" }}>© 2026 Sitecraft · Built in </div>
       </footer>
     </div>
   );
