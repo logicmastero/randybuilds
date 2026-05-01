@@ -308,10 +308,36 @@ export async function logGeneration(data: {
 
 // ─── DB init (run once on deploy) ────────────────────────────────────────────
 
+// ─── DB init (run once on deploy) ────────────────────────────────────────────
+
 export async function initDb() {
-  // Tables and indexes are managed via direct Neon migrations.
-  // This function is kept as a health check endpoint.
+  // Auto-create analytics table on first run
   const db = getDb();
+  try {
+    await db`
+      CREATE TABLE IF NOT EXISTS pageview_analytics (
+        id BIGSERIAL PRIMARY KEY,
+        site_slug TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        page_path TEXT,
+        scroll_depth INTEGER,
+        time_on_page INTEGER,
+        viewport_width INTEGER,
+        viewport_height INTEGER,
+        referrer TEXT,
+        user_agent TEXT,
+        session_id TEXT,
+        timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_pageview_site_timestamp ON pageview_analytics(site_slug, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_pageview_event ON pageview_analytics(site_slug, event_type);
+      CREATE INDEX IF NOT EXISTS idx_pageview_session ON pageview_analytics(session_id);
+    `;
+  } catch (e) {
+    console.warn("[initDb] Analytics table may already exist:", e);
+  }
+
   const rows = await db`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'public'
@@ -321,4 +347,110 @@ export async function initDb() {
     ok: true,
     tables: rows.map((r: { table_name: string }) => r.table_name),
   };
+}
+
+// ─── Analytics types ──────────────────────────────────────────────────────────
+
+export interface PageviewEvent {
+  site_slug: string;
+  event_type: "pageview" | "scroll" | "click" | "form_start" | "form_submit";
+  page_path?: string;
+  scroll_depth?: number;
+  time_on_page?: number;
+  viewport_width?: number;
+  viewport_height?: number;
+  referrer?: string;
+  user_agent?: string;
+  session_id?: string;
+}
+
+export interface ConversionMetrics {
+  site_slug: string;
+  total_pageviews: number;
+  form_starts: number;
+  form_submits: number;
+  conversion_rate: number;
+  avg_scroll_depth: number;
+  avg_time_on_page_ms: number;
+}
+
+// ─── Analytics helpers ────────────────────────────────────────────────────────
+
+export async function logPageviewEvent(event: PageviewEvent): Promise<void> {
+  const db = getDb();
+  await db`
+    INSERT INTO pageview_analytics (
+      site_slug, event_type, page_path, scroll_depth, time_on_page,
+      viewport_width, viewport_height, referrer, user_agent, session_id
+    )
+    VALUES (
+      ${event.site_slug},
+      ${event.event_type},
+      ${event.page_path ?? null},
+      ${event.scroll_depth ?? null},
+      ${event.time_on_page ?? null},
+      ${event.viewport_width ?? null},
+      ${event.viewport_height ?? null},
+      ${event.referrer ?? null},
+      ${event.user_agent ?? null},
+      ${event.session_id ?? null}
+    )
+  `;
+}
+
+export async function getConversionMetrics(siteSlugs?: string[]): Promise<ConversionMetrics[]> {
+  const db = getDb();
+  
+  let query = db`
+    SELECT 
+      site_slug,
+      COUNT(*) as total_pageviews,
+      COUNT(CASE WHEN event_type = 'form_start' THEN 1 END) as form_starts,
+      COUNT(CASE WHEN event_type = 'form_submit' THEN 1 END) as form_submits,
+      ROUND(100.0 * COUNT(CASE WHEN event_type = 'form_submit' THEN 1 END) / NULLIF(COUNT(*), 0), 2) as conversion_rate,
+      ROUND(AVG(scroll_depth)::numeric, 1) as avg_scroll_depth,
+      ROUND(AVG(time_on_page)::numeric, 0) as avg_time_on_page_ms
+    FROM pageview_analytics
+    WHERE created_at > NOW() - INTERVAL '30 days'
+  `;
+
+  if (siteSlugs && siteSlugs.length > 0) {
+    query = db`
+      SELECT 
+        site_slug,
+        COUNT(*) as total_pageviews,
+        COUNT(CASE WHEN event_type = 'form_start' THEN 1 END) as form_starts,
+        COUNT(CASE WHEN event_type = 'form_submit' THEN 1 END) as form_submits,
+        ROUND(100.0 * COUNT(CASE WHEN event_type = 'form_submit' THEN 1 END) / NULLIF(COUNT(*), 0), 2) as conversion_rate,
+        ROUND(AVG(scroll_depth)::numeric, 1) as avg_scroll_depth,
+        ROUND(AVG(time_on_page)::numeric, 0) as avg_time_on_page_ms
+      FROM pageview_analytics
+      WHERE site_slug = ANY(${siteSlugs})
+        AND created_at > NOW() - INTERVAL '30 days'
+      GROUP BY site_slug
+      ORDER BY total_pageviews DESC
+    `;
+  } else {
+    query = query` GROUP BY site_slug ORDER BY total_pageviews DESC`;
+  }
+
+  const rows = await query;
+  return rows as ConversionMetrics[];
+}
+
+export async function getPageviewEvents(
+  siteSlugs: string[],
+  limit: number = 1000,
+  offset: number = 0
+): Promise<Array<{ site_slug: string; event_type: string; created_at: string; scroll_depth?: number }>> {
+  const db = getDb();
+  const rows = await db`
+    SELECT site_slug, event_type, scroll_depth, created_at
+    FROM pageview_analytics
+    WHERE site_slug = ANY(${siteSlugs})
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `;
+  return rows as any[];
 }
