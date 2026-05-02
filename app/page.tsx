@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { TestimonialSection } from "./components/Testimonials";
 import { useRouter } from "next/navigation";
 
 type AppState = "landing" | "builder";
@@ -747,3 +748,4 @@ export default function Home() {
     </div>
   );
 }
+      <TestimonialSection />
